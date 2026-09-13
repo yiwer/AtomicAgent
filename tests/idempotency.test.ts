@@ -105,3 +105,23 @@ test('health reports scoped durable acceptance, replay and conflict observations
   assert.equal((await l.request('/internal/health')).status, 403);
   assert.equal(JSON.stringify(health).includes('Return three apples.'), false);
 });
+
+test('only a confirmed absent key plus a business rejection reports that the submission was not accepted', async t => {
+  const l = await lab(t);
+  const rejected = await l.request('/v1/runs', { ...task, profile: 'unavailable@2' });
+  assert.equal(rejected.status, 400);
+  assert.deepEqual(await rejected.json(), { error: 'config_unavailable', submission_status: 'not_accepted' });
+  await l.request('/v1/runs', task);
+  for (const [body, token, status] of [
+    [{ ...task, profile: 'unavailable@2' }, identities[0]!.token, 409],
+    [task, identities[3]!.token, 403],
+    [task, 'invalid-token', 401],
+  ] as const) {
+    const response = await l.request('/v1/runs', body, 'same-key', token);
+    assert.equal(response.status, status);
+    assert.equal((await response.json()).submission_status, undefined);
+  }
+  const recovered = await l.request('/v1/runs', task);
+  assert.equal(recovered.status, 202);
+  assert.equal((await (await l.request('/v1/runs')).json()).runs.length, 1);
+});

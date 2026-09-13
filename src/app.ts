@@ -83,6 +83,7 @@ export async function createApp(options: AppOptions) {
     response.setHeader('Referrer-Policy', 'no-referrer');
     response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     let identity: Identity | undefined;
+    let submissionNotAccepted = false;
     try {
       const path = new URL(request.url ?? '/', 'http://localhost').pathname;
       const method = request.method ?? 'GET';
@@ -147,6 +148,10 @@ export async function createApp(options: AppOptions) {
         send(response, 200, publicObject(object)); return;
       }
       if (path === '/v1/runs' && method === 'POST') {
+        const expectedActor = request.headers['x-submission-actor'];
+        const expectedWorkspace = request.headers['x-submission-workspace'];
+        if ((expectedActor !== undefined || expectedWorkspace !== undefined) &&
+            (expectedActor !== identity.actor || expectedWorkspace !== identity.workspace)) throw new ApiError(403, 'submission_identity_changed');
         const input = record(await body(request));
         const key = request.headers['idempotency-key'];
         if (typeof key !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(key)) throw new ApiError(400, 'idempotency_key_required');
@@ -156,6 +161,8 @@ export async function createApp(options: AppOptions) {
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
         const replay = store.replay(identity.actor, identity.workspace, key, requestDigest);
         if (replay) { send(response, 202, publicRun(replay)); return; }
+        // Only this confirmed absent binding can authorize discarding a rejected pending submission.
+        submissionNotAccepted = true;
         if (input.profile !== options.profile.id) throw new ApiError(400, 'config_unavailable');
         if (!['summary-value@1', 'data-statistics@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
         const bindings = input.output_contract === 'data-statistics@1' ? files.bind(identity, input.inputs) : [];
@@ -171,6 +178,7 @@ export async function createApp(options: AppOptions) {
           allocation: null, cleanup: { status: 'pending', observed_at: null, source: null }, validation: null, result: null,
         };
         run.manifest_digest = manifestDigest(run.manifest);
+        submissionNotAccepted = false;
         const accepted = store.accept(run, key);
         send(response, 202, publicRun(accepted)); worker.wake(); return;
       }
@@ -224,7 +232,8 @@ export async function createApp(options: AppOptions) {
       const status = error instanceof ApiError ? error.status : 503;
       const code = error instanceof ApiError ? error.code : 'service_unavailable';
       try { store.audit(identity?.actor ?? 'unauthenticated', identity?.workspace ?? null, 'request.reject', code); } catch { /* fail closed */ }
-      if (!response.headersSent) send(response, status, { error: code }); else response.end();
+      if (!response.headersSent) send(response, status, { error: code,
+        ...(submissionNotAccepted && status >= 400 && status < 500 ? { submission_status: 'not_accepted' } : {}) }); else response.end();
     }
   });
   server.requestTimeout = 10_000;

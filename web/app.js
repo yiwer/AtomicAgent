@@ -1,13 +1,13 @@
 const $ = id => document.getElementById(id);
 const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
-const errorText = { authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', config_unavailable: '登记配置不可用。', idempotency_conflict: '该提交身份已绑定其他内容，请刷新后创建新任务。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
+const errorText = { authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', submission_identity_changed: '登录身份已变化，请重新登录原身份后找回提交。', config_unavailable: '登记配置不可用。', idempotency_conflict: '原提交标识已绑定其他内容；已保留恢复材料，请核对原提交。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
 let me = null, selected = null, loading = false, pending = null, uploaded = null;
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const data = await response.json();
   if (!response.ok) {
-    if (response.status === 401) loggedOut();
-    throw Object.assign(new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`), { status: response.status });
+    if (response.status === 401 || data.error === 'submission_identity_changed') loggedOut();
+    throw Object.assign(new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`), { submissionStatus: data.submission_status });
   }
   return data;
 }
@@ -22,13 +22,14 @@ async function submitPending() {
   if (!identity || !submission) return;
   $('recover-submission').disabled = true;
   try {
-    const run = await api('/v1/runs', { method: 'POST', headers: { 'Idempotency-Key': submission.key }, body: submission.body });
+    const run = await api('/v1/runs', { method: 'POST', headers: { 'Idempotency-Key': submission.key,
+      'X-Submission-Actor': identity.actor, 'X-Submission-Workspace': identity.workspace }, body: submission.body });
     sessionStorage.removeItem(pendingStorageKey(identity));
     if (me !== identity) return;
     pending = null; selected = run.run_id; location.hash = run.run_id; await refresh();
   } catch (error) {
-    // A definitive rejection allows correction; unknown delivery and identity/conflict errors retain the original request.
-    if (error.status >= 400 && error.status < 500 && ![401, 409].includes(error.status)) {
+    // A permission denial cannot prove that an earlier submission was not accepted.
+    if (error.submissionStatus === 'not_accepted') {
       sessionStorage.removeItem(pendingStorageKey(identity));
       if (me === identity) pending = null;
     }
@@ -118,6 +119,7 @@ $('submit-form').addEventListener('submit', async event => {
   event.preventDefault(); $('submit').disabled = true;
   try {
     if (pending) { await submitPending(); return; }
+    if (!$('prompt').value.trim()) throw new Error('请填写非空任务提示词。');
     if ($('input-file').files.length && !uploaded) throw new Error('请先上传并校验输入文件。');
     const request = { prompt: $('prompt').value, profile: me.profile, output_contract: uploaded ? 'data-statistics@1' : me.output_contract,
       ...(uploaded ? { inputs: [{ file_id: uploaded.file_id, path: `input/data.${uploaded.format}` }] } : {}) };
