@@ -1,0 +1,42 @@
+Ticket01 continuation validation — 2026-09-14
+Baseline: 6d6fc3638cb6b48c66386121ddc123192518cf4f
+Documentation-only change; no live model or remote deployment performed.
+
+Check 1; exit code 0
+
+> atomicagent@0.0.1 typecheck
+> tsc --noEmit
+
+
+> atomicagent@0.0.1 test
+> tsx --test tests/*.test.ts
+
+✔ real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial (114.4662ms)
+✔ an empty provider listing cannot close an unknown create operation (3.8385ms)
+✔ unwritable recovery records do not block disposal of later resources, and observations reconcile after recovery (89.4916ms)
+✔ a failed terminal write cannot prevent cleanup of the same already-started execution on restart (52.2722ms)
+✔ an existing matching profile allows disposal even when a SQLite writer lock prevents transactions (5605.1808ms)
+✔ a submitted task survives restart with a validated result and verified cleanup (84.2198ms)
+✔ invalid schema, missing input, and missing authorization fail without an authoritative result (131.2984ms)
+✔ preparation failure cleans its allocated resource without starting an Attempt (25.6837ms)
+✔ cleanup uncertainty does not rewrite committed success and is retried on restart (36.8323ms)
+✔ authentication and server authorization isolate callers and health readers (149.0318ms)
+✔ concurrent duplicate submissions bind one Run, and changed content conflicts (62.362ms)
+✔ the registered runner cannot silently be replaced by a different execution mode (1.3539ms)
+✔ a nonresponsive preparation cannot outlive the platform deadline or lose its cleanup obligation (1250.1166ms)
+✔ a registered profile revision cannot be changed in place across restart (20.4117ms)
+✔ a live registration cannot switch to a fixture or another provider before recovery (22.6768ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6006.5405
+
+Check 2; exit code 0
+warning: in the working copy of '.scratch/v0/issues/01-first-validated-json-run.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.scratch/v0/ticket-plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/implementation/ticket01.md', LF will be replaced by CRLF the next time Git touches it
+Checked documentation links: 3 files; missing: []

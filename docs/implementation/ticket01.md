@@ -41,6 +41,8 @@ npm start
 
 使用 [profile.example.json](../../deploy/profile.example.json) 在 Linux 节点生成私有配置；占位值会拒绝启动。需获准的确切模型／endpoint、用途与计费授权引用、模型 secret 环境变量引用、固定 OpenSandbox Docker 部署修订、Linux 节点身份和最终 runner 镜像 digest。模型及 provider secret 只从指定服务端环境变量解析，不读取其他账户配置，不切换套餐／模型。
 
+2026-09-14 的 [外部预检](../../.scratch/v0/evidence/ticket01/external-preflight.md) 已确认用户提供的 Linux 节点可通过严格主机校验的 SSH 登录，Docker 已安装。模型 profile 的用途／凭据适用范围仍未解决；OpenSandbox、Node 与本票应用尚未部署，镜像 digest 和模型兼容性仍无真实证据。节点现有 `127.0.0.1:8080` 已占用，不能直接使用示例端口；适配器当前每个 sandbox 请求 `4Gi` 内存，而预检记录节点约 3.6 GiB 内存，部署前须核实实际可分配资源及登记限制，不能把此节点视为已通过容量验收。
+
 ```bash
 # 由获准节点提供准确 digest；不会默认选择或拉取其他镜像。
 docker build --build-arg NODE_IMAGE="<approved-node-24.18.0-image@sha256:digest>" \
@@ -65,10 +67,13 @@ runner 固定 Claude Agent SDK **0.3.270** 及该包携带的 CLI、Node **24.18
 | 完整测试 | `npm test` | 15／15 通过，0 跳过 |
 | 构建入口／跨进程重启／排他锁 | `npm run build` 后 `npx tsx scripts/verify-local.ts` | 通过；fixture，隔离临时库，审计子进程已停止 |
 | 生产依赖审计 | `npm audit --omit=dev` | 0 漏洞；不包含开发工具依赖 |
-| Linux／Docker／真实 SDK／模型／网络／内容 | 尚无获准配置 | 未执行，待外部输入 |
+| Linux 节点／SSH／Docker 安装预检 | [外部预检](../../.scratch/v0/evidence/ticket01/external-preflight.md) | SSH 已打通；只读观测通过，不是部署或隔离验收 |
+| OpenSandbox 部署／真实 SDK／模型／网络／内容 | 确切获准 profile、镜像与部署仍待落实 | 未执行；模型用途／凭据适用范围未解决 |
 | 人工验收 | 用户确认 | 待确认 |
 
 本票不关闭后续票或父规格。7 天记录保留、文件保留、审计查询导出、完整部署资格等按原计划后续切片交付。
+
+现有接口、证据复核及下游复用边界见 [本票实施交接](../../.scratch/v0/evidence/ticket01/implementation-handoff.md)。接口可供后续实现评估复用，不表示本票综合 AC 已通过或依赖关系已放行。
 
 执行输出见 [完整测试记录](../../.scratch/v0/evidence/ticket01/unit-tests.txt)、[浏览器测试记录](../../.scratch/v0/evidence/ticket01/browser-tests.txt)；截图见 [桌面工作区](../../.scratch/v0/evidence/ticket01/workspace.png)、[任务详情](../../.scratch/v0/evidence/ticket01/detail.png)、[手机布局](../../.scratch/v0/evidence/ticket01/mobile.png)。[双轴审查](../../.scratch/v0/evidence/ticket01/review.md) 的已发现问题已修复并复审。
 
