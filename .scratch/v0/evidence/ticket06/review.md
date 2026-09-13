@@ -24,3 +24,5 @@ Disposition: no blocking findings. Review does not establish live SDK/model comp
 During implementation root requested journal failure fail-closed behavior (now explicit deny/abort, sticky failure and RED/GREEN coverage); bounded matching journal recovery after failed remote command (real SDK/local HTTP tests); a genuine caller-owned upload/Run/Artifact test (present); accurate per-stage evidence sources (present); mobile evidence scrolled into view and checkbox layout (verified); and precise OS isolation wording (docs now explicitly say runner and Claude share uid1000, with tool allowlist protection rather than different OS identities).
 
 Final summary: Standards 1 non-blocking P3 maintenance observation, 0 hard violations; Spec 0 actionable findings. No unresolved blocking findings. Final documentation-only follow-up preserves checkpoint product behavior.
+
+Post-review documentation correction: Ticket01 already supplied and verified a designated Ubuntu node and SSH identity. Ticket06 docs now preserve that evidence and identify the remaining gap as model approval/binding, unexecuted deployment and unqualified runtime image/resources. No product code changed.

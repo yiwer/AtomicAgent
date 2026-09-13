@@ -79,7 +79,7 @@ OpenSandbox成功包和异常退出后读取的journal均须通过固定摘要�
 
 本地固定 `@anthropic-ai/claude-agent-sdk@0.3.270` 的 sdk.d.ts 定义 skills 允许集、显式插件、system/init.skills/tools/plugins、PreToolUse/PostToolUse/PostToolUseFailure。官方[SDK Skills](https://code.claude.com/docs/en/agent-sdk/skills)说明插件路径可用于空settingSources，显式tools须包含Skill，插件名称采用plugin:skill，init提供加载清单；[SDK Plugins](https://code.claude.com/docs/en/agent-sdk/plugins)说明本地插件装载入口。查证日期2026-09-14。这些文档和QueryPort替身支持实现方式，不证明具体模型的实际调用兼容性。
 
-真实验收仍需准确获准 endpoint/model、服务端环境变量名和用途／计费授权、指定Linux节点、已构建并固定摘要的runner镜像与OpenSandbox。取得后应使用上述普通API／A路径在真实profile执行CSV样例，记录SDK初始化、Skill成功工具hook、校验统计和Artifact字节、独立清理；再重复缺入口和无使用证据负例。不得用fixture关闭该门槛。本票未读取无关凭据、未调用原Qwen套餐、未部署远端。
+Ticket01 的[外部预检](../../.scratch/v0/evidence/ticket01/external-preflight.md)已记录指定Ubuntu节点（159.75.158.26，agent.91boy.cn）及SSH信任核验。06未重复SSH访问或执行Linux部署；实际资源、OpenSandbox部署和固定摘要runner镜像的资格仍未验证。真实验收还需准确获准 endpoint/model、适用服务端环境变量绑定及用途／计费授权。取得后应使用上述普通API／A路径在真实profile执行CSV样例，记录SDK初始化、Skill成功工具hook、校验统计和Artifact字节、独立清理；再重复缺入口和无使用证据负例。不得用fixture关闭该门槛。本票未读取无关凭据、未调用原Qwen套餐、未部署远端。
 
 ## 验证与审查
 
