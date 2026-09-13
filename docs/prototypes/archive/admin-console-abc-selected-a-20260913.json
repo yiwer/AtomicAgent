@@ -1,0 +1,16 @@
+{
+  "selected_variant": "A",
+  "user_statement": "选择A",
+  "date": "2026-09-13",
+  "artifact": "admin-console-abc-selected-a-20260913.zip",
+  "sha256": "3e11887375da06e0c9f64e41d0e021a980d40251b9975d9369beceae0bd4e6d0",
+  "files": [
+    "index.html",
+    "app.js",
+    "styles.css",
+    "serve.py",
+    "README.md"
+  ],
+  "scope": "UI design choice; mock prototype, not production acceptance",
+  "capture": "Local source archive; no Git repository or issue tracker configured"
+}
