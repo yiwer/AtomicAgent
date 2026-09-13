@@ -61,4 +61,3 @@ test('A reports an expired cursor and queries the authoritative Run', async ({ p
   await expect(page.locator('#result')).toContainText('three apples');
   await expect(page.locator('#facts')).toContainText('已核验回收');
 });
-

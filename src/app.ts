@@ -44,6 +44,9 @@ function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(400, 'invalid_request');
   return value as Record<string, unknown>;
 }
+function sessionId(request: IncomingMessage) {
+  return request.headers.cookie?.match(/(?:^|; )atomic_session=([a-f0-9-]+)(?:;|$)/)?.[1];
+}
 export async function createApp(options: AppOptions) {
   options = { ...options, profile: structuredClone(options.profile), identities: structuredClone(options.identities) };
   validateProfile(options.profile);
@@ -69,7 +72,7 @@ export async function createApp(options: AppOptions) {
       const identity = options.identities.find(i => timingSafeEqual(digest(i.token), digest(bearer)));
       if (identity) return identity;
     } else {
-      const session = request.headers.cookie?.match(/(?:^|; )atomic_session=([a-f0-9-]+)(?:;|$)/)?.[1];
+      const session = sessionId(request);
       const found = session && sessions.get(session);
       if (found && found.expires > clock()) return found.identity;
     }
@@ -82,16 +85,16 @@ export async function createApp(options: AppOptions) {
     response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(JSON.stringify(data));
   }
   async function replySubmission(request: IncomingMessage, response: ServerResponse, run: Run, waitSeconds: number) {
-    const until = Date.now() + waitSeconds * 1000;
+    const until = performance.now() + waitSeconds * 1000;
     let current = run;
     let disconnected = response.destroyed;
     let wake: (() => void) | undefined;
     const onClose = () => { disconnected = true; wake?.(); };
     response.once('close', onClose);
     try {
-      while (waitSeconds > 0 && !current.terminal_at && !disconnected && Date.now() < until) {
+      while (waitSeconds > 0 && !current.terminal_at && !disconnected && performance.now() < until) {
         await new Promise<void>(resolve => {
-          const timer = setTimeout(() => { wake = undefined; resolve(); }, Math.min(25, until - Date.now()));
+          const timer = setTimeout(() => { wake = undefined; resolve(); }, Math.min(25, until - performance.now()));
           wake = () => { clearTimeout(timer); wake = undefined; resolve(); };
         });
         current = store.get(run.run_id)!;
@@ -130,7 +133,7 @@ export async function createApp(options: AppOptions) {
         identity = authenticate(request);
         store.audit(identity.actor, identity.workspace, 'session.create', 'allowed');
         for (const [key, value] of sessions) if (value.expires <= clock()) sessions.delete(key);
-        const previousSession = request.headers.cookie?.match(/(?:^|; )atomic_session=([a-f0-9-]+)(?:;|$)/)?.[1];
+        const previousSession = sessionId(request);
         if (previousSession) sessions.delete(previousSession);
         if (sessions.size >= 1000) throw new ApiError(503, 'session_capacity');
         const session = randomUUID(); sessions.set(session, { identity, expires: clock() + 8 * 3600_000 });
@@ -139,7 +142,7 @@ export async function createApp(options: AppOptions) {
       }
       identity = authenticate(request);
       if (path === '/auth/logout' && method === 'POST') {
-        const session = request.headers.cookie?.match(/atomic_session=([a-f0-9-]+)/)?.[1];
+        const session = sessionId(request);
         if (session) sessions.delete(session);
         response.setHeader('Set-Cookie', 'atomic_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
         send(response, 200, { logged_out: true }); return;

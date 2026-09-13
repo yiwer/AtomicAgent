@@ -33,6 +33,6 @@ npm start
 
 ## 验证与未完成条件
 
-详见 [证据账本](../../.scratch/v0/evidence/ticket04/verification.md)。公开 API 测试使用独立临时库和明确标识的 SandboxPort；真实 socket／浏览器故障与执行替身分别列账。没有调用未授权模型或远程服务，没有 Docker/gVisor、生产网络或人工验收证据。
+详见 [证据账本](../../.scratch/v0/evidence/ticket04/verification.md)。最终类型／构建通过，完整测试45/45、编译后HTTP/SSE8/8、浏览器9/9。Standards 的P3重复Cookie解析已统一并复核0剩余，Spec初审及增量复核0问题。公开 API 测试使用独立临时库和明确标识的 SandboxPort；真实 socket／浏览器故障与执行替身分别列账。没有调用未授权模型或远程服务，没有 Docker/gVisor、生产网络或人工验收证据。
 
 真实验收继承 Ticket01 所需获准模型 endpoint、model、服务端 secret 变量引用、计费用途、固定 Linux/OpenSandbox/镜像身份。条件到位后用同一公开等待／断连／重放路径核对真实模型执行计数、权威结果与资源核验；不能用本票确定性通过关闭这些门槛。

@@ -186,6 +186,30 @@ test('a pre-events database exposes an explicit current snapshot directly to its
   assert.deepEqual(await events(await l.request(`/v1/runs/${run.run_id}/events`, { signal: AbortSignal.timeout(3000) }), 1), snapshot);
 });
 
+test('running Runs retain events beyond seven days of observation time and a logged-out waiter cannot receive a Result', async t => {
+  const sandbox = new FixtureSandbox();
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  const execute = sandbox.execute.bind(sandbox);
+  sandbox.execute = async (run, signal) => { await gate; return execute(run, signal); };
+  const l = await lab(t, sandbox);
+  try {
+    const run = await (await l.request('/v1/runs', submit('0'))).json();
+    l.advance(8 * 24 * 3600_000);
+    const progress = await events(await l.request(`/v1/runs/${run.run_id}/events`, { signal: AbortSignal.timeout(3000) }), 3);
+    assert.equal(progress.at(-1)!.data.status, 'running');
+    const login = await l.request('/auth/session', { method: 'POST', body: JSON.stringify({ token: identities[0]!.token }) });
+    const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+    const waiting = l.request('/v1/runs?wait_seconds=1', { ...submit('1'), headers: { Authorization: '', Cookie: cookie, 'Idempotency-Key': 'wait-task' } });
+    await delay(100);
+    assert.equal((await l.request('/auth/logout', { method: 'POST', headers: { Authorization: '', Cookie: cookie } })).status, 200);
+    release();
+    const rejected = await waiting;
+    assert.equal(rejected.status, 401); assert.deepEqual(await rejected.json(), { error: 'authentication_required' });
+    const authoritative = await (await l.request(`/v1/runs/${run.run_id}`)).json();
+    assert.equal(authoritative.status, 'succeeded'); assert.equal(authoritative.execution.deadline_at, run.execution.deadline_at);
+  } finally { release(); }
+});
+
 test('a slow real HTTP consumer advances through a multi-page recovery backlog and resumes its last consumed cursor', async t => {
   const l = await lab(t, new FixtureSandbox('cleanup-unknown'));
   const run = await (await l.request('/v1/runs?wait_seconds=1', submit('1'))).json();
