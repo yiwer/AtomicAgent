@@ -35,3 +35,5 @@
 - 2026-09-14：根据用户“接受”发布；尚未开始产品实现或验收。
 
 - 2026-09-14：已实现 API / A 的显式 Artifact 复用、固定 InputBinding、独立 sandbox 副本及 TTL / 复制故障边界。实现和分层证据见 [ticket08](../../../../docs/implementation/ticket08.md)；代码验证中，真实两次模型任务与 Linux / 人工综合 AC 仍待授权输入，验收不勾选。
+
+- 2026-09-14：实现及代码验证完成；完整 suite 103/103、完整 Chromium 16/16、类型／构建通过，A组合与命名修复后各聚焦 Chromium1/1。双轴审查 Standards 初审0硬违规＋1低优先级命名判断，独立修复复核已关闭；Spec 0实现缺陷／0scope creep，保留真实验收未完成事实。固定checkpoint `0c5115e4d1ec9ebffbd26f41eaf857610236066e`，修复 `7fd487d475fe8cfe7b0f60569fabc22451a0f8c8`，详见[审查证据](../evidence/ticket08/review.md)。仍未执行两次真实模型／Linux／人工综合验收，AC保持未勾选。

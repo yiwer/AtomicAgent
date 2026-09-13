@@ -18,3 +18,5 @@
 实际模型／远端服务未调用；无邮件、Slack等外发消息。日志只记录测试输出、受控错误类别，不含认证秘密。
 
 当前完整 suite：103/103；完整 Chromium：16/16；A研究 MCP 切回文件任务调整后聚焦 Chromium：1/1。typecheck / build 通过。
+
+Standards命名修复后聚焦Chromium1/1，原始输出browser-review-fix.txt；双轴结果见review.md。
