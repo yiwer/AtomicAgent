@@ -35,10 +35,10 @@ npx tsx scripts/verify-research-network.ts
 ## 当前证据
 
 - TDD 首条 API RED（目录未提供 MCP）→GREEN；协议额外参数 RED（SDK 默认剔除额外字段）→严格 schema GREEN。
-- 聚焦 9/9；typecheck/build 通过；最新完整集 87/87（审查修复后末尾复验另记）。首次全套 81/83 暴露旧 Skill 故障 seam 缺少 mcp 字段时中断 journal 导入，修复兼容读取后对应 5/5 及全套通过。
+- 聚焦 9/9；typecheck/build 通过；审查修复后完整集 87/87。首次全套 81/83 暴露旧 Skill 故障 seam 缺少 mcp 字段时中断 journal 导入，修复兼容读取后对应 5/5 及全套通过。
 - 完整浏览器 15/15；本票另 1/1 覆盖新增移动下载与预期身份拒绝。真实截图归档本票，不把重跑的旧票截图纳入本次变更。
-- [network.json](../../.scratch/v0/evidence/ticket07/network.json)：2026-09-13T23:07:53Z，本地真实 MCP 协议＋公开网络读取两源 HTTP200、节选摘要与快照相同；模型未调用、sandbox 未创建。
-- 双轴 code-review：以启动 `ea6b4d4632e73ae958f3994f9382f9f31d10ac7d` 为整票基线，待末尾记录审查结果。
+- [network.json](../../.scratch/v0/evidence/ticket07/network.json)：2026-09-13T23:21:30Z，本地真实 MCP 协议＋公开网络读取两源 HTTP200、节选摘要与快照相同；模型未调用、sandbox 未创建。
+- 双轴 code-review：以启动 `ea6b4d4632e73ae958f3994f9382f9f31d10ac7d` 为整票基线，两个 fresh 只读 reviewer 在 1d6ce91 确认全部关闭：Standards 初始 1 项硬 P2，Spec 初始 3 项 P2，其中调用审计重叠；最终两轴均 0 未解决。详见 [review ledger](../../.scratch/v0/evidence/ticket07/review.md)。
 
 未完成：确切获准模型 endpoint/model、服务端凭据变量及用途/计费授权仍待提供；真实模型工具循环、OpenSandbox 研究 Run、真实隔离和人工结论验收未执行。用户已提供 Ubuntu 节点 `159.75.158.26` / `agent.91boy.cn` 并完成 SSH 信任预检，当前缺的是实际部署与资源/镜像资格，不是节点地址。若用户指定外部 MCP，其确切传输/修订/来源仍需单独匹配登记，不将 sdk 传输证据自动套用。
 
@@ -47,3 +47,5 @@ npx tsx scripts/verify-research-network.ts
 本地 Claude SDK `0.3.270` 的 sdk.d.ts、MCP SDK `1.30.0` 的 McpServer strict inputSchema，以及 zod `4.6.4` 已核对并固定为直接依赖。官方 [custom tools 文档](https://code.claude.com/docs/en/agent-sdk/custom-tools)说明 createSdkMcpServer 的进程内传输和工具权限；[MCP tools 规范](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)区分工具列表与实际调用。官方文档证明接口设计依据，不代表当前镜像/模型兼容性已实测。
 
 审查修复：Standards 1 项硬违规（调用审计）与 Spec 3 项 P2（调用审计、未知用量、授权摘要）中的调用审计重叠，共 3 个独立问题；另修复 root 发现的 MCP 失败归入 Skill 健康计数。修复保持读源范围，不实现通用调用树或后续模型用量账本。
+
+提交链：4b5d005（完整实施）→849719d（调用审计/未知用量/授权摘要/健康归因）→1d6ce91（重复来源拒绝记录）；最后独立证据提交仅更新文档与本票截图。

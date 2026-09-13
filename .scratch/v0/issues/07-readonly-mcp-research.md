@@ -42,3 +42,5 @@
 - 2026-09-14：根据用户“接受”发布；尚未开始产品实现或验收。
 
 - 2026-09-14：已实现固定 sdk 只读 MCP 修订、真实协议探测、research-report@1、Claude 研究 runner、当次来源/引用校验和普通 Markdown Artifact，A 刷新/探测/下载及授权拒绝已验证。公开两源真实 GET 通过；模型未调用、sandbox 未创建，综合 AC 保持未勾选。证据与命令见 [ticket07](../../../docs/implementation/ticket07.md)。整票基线 ea6b4d4632e73ae958f3994f9382f9f31d10ac7d，末尾双轴审查另记。
+
+- 2026-09-14：4b5d005 实施，849719d/1d6ce91 修复审查问题。最终双轴复核均 0 未解决（Standards 初始1，Spec初始3；调用审计重叠），另修复MCP失败污染Skill健康归因。聚焦9/9，完整87/87，浏览器15/15；真实本地MCP协议＋公开GET两源200，模型/OpenSandbox/人工语义验收仍未执行。执行命令、固定SHA和分层证据均见ticket07交付文档。

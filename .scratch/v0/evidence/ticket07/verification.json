@@ -1,0 +1,77 @@
+{
+  "ticket": "07",
+  "baseline": "ea6b4d4632e73ae958f3994f9382f9f31d10ac7d",
+  "implementation_commits": [
+    "4b5d005",
+    "849719d",
+    "1d6ce91"
+  ],
+  "verification": {
+    "typecheck": {
+      "command": "npm run typecheck",
+      "status": "passed",
+      "commit": "1d6ce91"
+    },
+    "build": {
+      "command": "npm run build",
+      "status": "passed",
+      "commit": "1d6ce91"
+    },
+    "focused": {
+      "command": "npx tsx --test tests/research.test.ts tests/research-protocol.test.ts",
+      "passed": 9,
+      "failed": 0,
+      "notes": "Full focused set at 849719d; protocol 7/7 after duplicate-denial fix; final full includes all 9."
+    },
+    "full": {
+      "command": "npm test",
+      "passed": 87,
+      "failed": 0,
+      "duration_ms": 38733.5739,
+      "commit": "1d6ce91"
+    },
+    "browser": {
+      "command": "npm run test:browser",
+      "passed": 15,
+      "failed": 0,
+      "duration_seconds": 43.4,
+      "commit": "849719d",
+      "notes": "Subsequent 1d6ce91 only changes repeated source denial handler and its protocol regression; UI unchanged. Mobile Markdown download clicked and completed."
+    },
+    "network": {
+      "command": "npx tsx scripts/verify-research-network.ts",
+      "status": "passed",
+      "commit": "1d6ce91",
+      "sources": 2,
+      "HTTP_status": [
+        200,
+        200
+      ],
+      "observed_at": "2026-09-13T23:21:30.465Z",
+      "model": "not-called",
+      "sandbox": "not-created"
+    }
+  },
+  "review": {
+    "baseline": "ea6b4d4632e73ae958f3994f9382f9f31d10ac7d",
+    "final_reviewed": "1d6ce915a6f63ac92e00d964ce62ba61e4ce2563",
+    "standards": {
+      "initial_hard": 1,
+      "open_hard": 0
+    },
+    "spec": {
+      "initial": 3,
+      "open": 0
+    },
+    "independent_reviewer_issues": 3,
+    "root_health_attribution_regression": "fixed",
+    "kind": "read-only static independent axes"
+  },
+  "not_verified": [
+    "approved-model driven real research Run",
+    "OpenSandbox deployment and image qualification",
+    "Docker/gVisor isolation",
+    "human semantic and full AC acceptance"
+  ],
+  "recorded_at": "2026-09-13T23:23:15.904Z"
+}
