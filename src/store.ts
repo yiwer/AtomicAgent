@@ -118,7 +118,8 @@ export class Store {
       this.db.prepare('INSERT INTO runs VALUES(?,?,?,?,?)').run(run.run_id, run.owner, run.workspace, key, JSON.stringify(run));
       this.audit(run.owner, run.workspace, 'run.accept', 'accepted', run.run_id);
       this.appendEvent(run);
-      this.audit('platform', run.workspace, 'grant.freeze', run.manifest.grant.inputs.length ? 'model-and-process-data@1' : 'model-only', run.run_id);
+      this.audit('platform', run.workspace, 'grant.freeze', run.manifest.grant.mcp?.length ? 'model-and-registered-readonly' : run.manifest.grant.inputs.length ? 'model-and-process-data@1' : 'model-only', run.run_id);
+      for (const binding of run.manifest.grant.mcp ?? []) this.audit('platform', run.workspace, 'grant.mcp-freeze', 'registered-readonly', run.run_id, { source: 'platform:fixed-manifest', resource_id: `mcp:${binding.id}@${binding.version}`, operation_id: binding.content_digest, observed_at: now() });
       for (const binding of run.manifest.grant.inputs) this.audit(run.owner, run.workspace, 'input.bind', 'fixed-authorized-content', run.run_id,
         { source: 'platform:input-object', resource_id: binding.file_id, operation_id: null, observed_at: now() });
       return run;

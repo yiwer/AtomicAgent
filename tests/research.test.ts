@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createApp } from '../src/app.js';
 import { FixtureSandbox } from '../src/fixture-sandbox.js';
+import { TaskError } from '../src/domain.js';
 import { fixtureProfile } from '../src/profile.js';
 const identity = { token: 'm'.repeat(40), actor: 'operator', workspace: 'lab', role: 'maintainer' as const };
 test('registered MCP research delivers sourced Markdown after cleanup and retains fixed grant on replay', async t => {
@@ -44,6 +45,7 @@ test('MCP candidate envelope cannot forge audit fields or another Attempt; missi
  const sandbox = new FixtureSandbox(), execute = sandbox.execute.bind(sandbox);
  let scenario = 'polluted';
  sandbox.execute = async (run, signal, skills, mcp) => {
+  if (scenario === 'lost-observation') throw new TaskError('runtime_failed');
   const result = await execute(run, signal, skills, mcp) as any;
   if (scenario === 'polluted') result.mcp[0].secret = 'SYNTHETIC_SECRET';
   if (scenario === 'attempt') result.mcp[0].attempt_id = 'another-attempt';
@@ -59,9 +61,12 @@ test('MCP candidate envelope cannot forge audit fields or another Attempt; missi
  await request('/v1/configurations/commands', { ...command, preview_digest: preview.preview_digest });
  assert.equal((await request('/v1/configurations/mcp-probe', { id: 'research', version: '1' }, 'probe', 'c'.repeat(40))).status, 403);
  const task = { prompt: 'Research', profile: fixtureProfile.id, output_contract: 'research-report@1', mcp: [{ id: 'research', version: '1' }] };
- for (scenario of ['polluted', 'attempt', 'sources']) {
+ for (scenario of ['polluted', 'attempt', 'sources', 'lost-observation']) {
   const r = await request('/v1/runs?wait_seconds=5', task, scenario); const text = await r.text(); assert.ok(!text.includes('SYNTHETIC_SECRET'));
-  const run = JSON.parse(text); assert.equal(run.status, 'failed'); assert.equal((await request('/v1/runs/'+run.run_id+'/result')).status, 409);
+  const run = JSON.parse(text); assert.equal(run.status, 'failed');
+  if (scenario === 'sources') assert.deepEqual(run.mcp[0].calls.map((c: any) => c.outcome), ['acquired','acquired']);
+  if (scenario === 'lost-observation') { assert.equal(run.mcp[0].usage.requests, null); assert.equal(run.mcp[0].usage.bytes, null); assert.equal(run.mcp[0].usage.completeness, 'unknown'); } assert.equal((await request('/v1/runs/'+run.run_id+'/result')).status, 409);
  }
  assert.equal(sandbox.executions.size, 3);
+ const health = await (await request('/internal/health')).json(); assert.equal(health.skills.failed_runs, 0); assert.equal(health.mcp.failed_runs, 2);
 });

@@ -70,5 +70,5 @@ for (const scenario of ['redirect', 'oversize', 'timeout', 'source-instructions'
  if (scenario === 'source-instructions') {
   assert.equal(result.receipts.length, 2); assert.equal(result.receipts[0]!.source, 'controlled-mcp:read_source');
   assert.deepEqual(contacted, network.sources.map(s => s.url)); assert.equal(result.evidence.usage.tokens, null);
- } else { assert.equal(result.receipts.length, 0); assert.equal(result.evidence.authorized, null); }
+ } else { assert.equal(result.receipts.length, 0); assert.equal(result.evidence.authorized, null); assert.equal((result.evidence as any).calls[0].outcome, 'failed'); }
 });
