@@ -73,7 +73,7 @@ runner 固定 Claude Agent SDK **0.3.270** 及该包携带的 CLI、Node **24.18
 
 本票不关闭后续票或父规格。7 天记录保留、文件保留、审计查询导出、完整部署资格等按原计划后续切片交付。
 
-现有接口、证据复核及下游复用边界见 [本票实施交接](../../.scratch/v0/evidence/ticket01/implementation-handoff.md)。接口可供后续实现评估复用，不表示本票综合 AC 已通过或依赖关系已放行。
+现有接口、证据复核及下游复用边界见 [本票实施交接](../../.scratch/v0/evidence/ticket01/implementation-handoff.md)。用户本轮授权下游基于已验证接口继续实现与确定性验证；本票综合 AC 和下游真实验收门槛仍未通过，依赖图保持不变。
 
 执行输出见 [完整测试记录](../../.scratch/v0/evidence/ticket01/unit-tests.txt)、[浏览器测试记录](../../.scratch/v0/evidence/ticket01/browser-tests.txt)；截图见 [桌面工作区](../../.scratch/v0/evidence/ticket01/workspace.png)、[任务详情](../../.scratch/v0/evidence/ticket01/detail.png)、[手机布局](../../.scratch/v0/evidence/ticket01/mobile.png)。[双轴审查](../../.scratch/v0/evidence/ticket01/review.md) 的已发现问题已修复并复审。
 
