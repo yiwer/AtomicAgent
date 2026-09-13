@@ -3,7 +3,7 @@ import { observeRun } from './events.js';
 const $ = id => document.getElementById(id);
 const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
 const errorText = { file_expired: '源文件已过期，请选择仍有效的产物。', file_incomplete: '源文件内容不完整，未接纳新任务。请选择其他产物。', input_contract_incompatible: '此产物不符合当前 CSV / 行数组 JSON 统计契约。', file_not_found: '源文件不存在或当前身份无权访问，请重新选择。', configuration_identity_changed: '登录身份已变化；请登录原身份找回配置操作。', configuration_conflict: '配置已被其他操作更新。请打开最新修订并重新预览。', configuration_preview_required: '请重新预览当前配置后再发布。', binding_not_allowed: '所选配置超过服务端登记的允许范围。', configuration_command_conflict: '此操作标识已绑定其他内容，请保留原操作材料核对。', authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', submission_identity_changed: '登录身份已变化，请重新登录原身份后找回提交。', config_unavailable: '登记配置不可用。', idempotency_conflict: '原提交标识已绑定其他内容；已保留恢复材料，请核对原提交。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
-let me = null, selected = null, loading = false, pending = null, uploaded = null;
+let me = null, selected = null, loading = false, pending = null, selectedInput = null;
 let observation = null;
 const configurations = configurationPanel({ api, identity: () => me });
 function stopObservation() { observation?.stop(); observation = null; }
@@ -55,7 +55,7 @@ async function submitPending() {
 function loggedOut() {
   configurations.logout();
   stopObservation();
-  me = null; selected = null; uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
+  me = null; selected = null; selectedInput = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
   $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('skill-evidence').replaceChildren(); $('mcp-evidence').textContent = ''; $('input-bindings').replaceChildren(); $('artifacts').replaceChildren(); $('detail').close();
   renderPending();
@@ -112,7 +112,7 @@ async function renderDetail(id, open = false) {
           if (me !== identity) return;
           if (source.availability !== 'available') throw new Error('源产物已失效，请刷新后重新选择。');
           const clearedMcp = !!$('mcp-revision').value; $('mcp-revision').value = '';
-          uploaded = source; $('input-file').value = '';
+          selectedInput = source; $('input-file').value = '';
           $('input-status').textContent = `显式引用 Artifact ${source.artifact_id} · 原 Run ${id} · 原期限 ${source.expires_at} · 提交时将校验内容并创建独立副本${clearedMcp ? ' · 已取消研究 MCP 选择，切回文件任务' : ''}`;
           $('prompt').value = '仅处理本次显式输入的数据，保序生成有效 CSV、拒绝 JSON 和十进制统计。';
           $('detail').close(); $('prompt').focus(); $('error').hidden = true;
@@ -175,11 +175,11 @@ $('submit-form').addEventListener('submit', async event => {
   try {
     if (pending) { await submitPending(); return; }
     if (!$('prompt').value.trim()) throw new Error('请填写非空任务提示词。');
-    if ($('input-file').files.length && !uploaded) throw new Error('请先上传并校验输入文件。');
-    if (uploaded && configurations.selection().mcp?.length) throw new Error('文件输入不能用于研究报告任务，请取消研究 MCP 选择后提交。');
-    if (!uploaded && configurations.selection().skills?.length) throw new Error('所选 Skill 用于文件处理，请先上传 CSV 或 JSON 输入。');
-    const request = { prompt: $('prompt').value, ...configurations.selection(), output_contract: configurations.selection().mcp?.length ? 'research-report@1' : uploaded ? 'data-statistics@1' : me.output_contract,
-      ...(uploaded ? { inputs: [{ ...(uploaded.artifact_id ? { artifact_id: uploaded.artifact_id } : { file_id: uploaded.file_id }), path: `input/data.${uploaded.format}` }] } : {}) };
+    if ($('input-file').files.length && !selectedInput) throw new Error('请先上传并校验输入文件。');
+    if (selectedInput && configurations.selection().mcp?.length) throw new Error('文件输入不能用于研究报告任务，请取消研究 MCP 选择后提交。');
+    if (!selectedInput && configurations.selection().skills?.length) throw new Error('所选 Skill 用于文件处理，请先上传 CSV 或 JSON 输入。');
+    const request = { prompt: $('prompt').value, ...configurations.selection(), output_contract: configurations.selection().mcp?.length ? 'research-report@1' : selectedInput ? 'data-statistics@1' : me.output_contract,
+      ...(selectedInput ? { inputs: [{ ...(selectedInput.artifact_id ? { artifact_id: selectedInput.artifact_id } : { file_id: selectedInput.file_id }), path: `input/data.${selectedInput.format}` }] } : {}) };
     const submission = { key: crypto.randomUUID(), body: JSON.stringify(request) };
     sessionStorage.setItem(pendingStorageKey(me), JSON.stringify(submission));
     pending = submission; renderPending(); await submitPending();
@@ -187,8 +187,8 @@ $('submit-form').addEventListener('submit', async event => {
   finally { renderPending(); }
 });
 $('recover-submission').addEventListener('click', submitPending);
-$('input-file').addEventListener('change', () => { uploaded = null; $('input-status').textContent = '文件待上传校验'; });
-$('clear-input').addEventListener('click', () => { uploaded = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; });
+$('input-file').addEventListener('change', () => { selectedInput = null; $('input-status').textContent = '文件待上传校验'; });
+$('clear-input').addEventListener('click', () => { selectedInput = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; });
 $('upload-input').addEventListener('click', async () => {
   const file = $('input-file').files[0]; $('upload-input').disabled = true;
   try {
@@ -197,7 +197,7 @@ $('upload-input').addEventListener('click', async () => {
     const identity = me;
     const object = await api('/v1/files', { method: 'POST', headers: { 'X-File-Format': file.name.split('.').pop().toLowerCase(), 'Content-Type': 'application/octet-stream' }, body: file });
     if (me !== identity || $('input-file').files[0] !== file) return;
-    uploaded = object;
+    selectedInput = object;
     $('input-status').textContent = `已校验 · ${object.size_bytes} bytes · ${object.file_id} · 保留至 ${new Date(object.expires_at).toLocaleString('zh-CN')}`;
     $('prompt').value = '按十进制处理输入数据。负数和零有效，非数字行进入拒绝清单；保持输入顺序，输出有效 CSV、拒绝 JSON 和统计。';
     $('error').hidden = true;
