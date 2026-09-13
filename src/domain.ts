@@ -7,6 +7,7 @@ export interface Profile {
   secret_ref: string; provider_ref: string; provider_endpoint: string; linux_node: string; runtime: 'docker';
   timeout_seconds: number; approval_ref: string;
 }
+export interface RevisionRef { profile_id: string; version: string }
 export const outputSchema = {
   type: 'object', properties: { summary: { type: 'string', minLength: 1, maxLength: 500 }, value: { type: 'integer' } },
   required: ['summary', 'value'], additionalProperties: false,
@@ -22,7 +23,7 @@ export class ApiError extends Error {
 export interface Run {
   run_id: string; owner: string; workspace: string; request_digest: string; prompt: string;
   request_digest_version?: 2; manifest_digest?: string;
-  manifest: { profile: Profile; output_contract: 'summary-value@1' | 'data-statistics@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema;
+  manifest: { profile: Profile; environment?: RevisionRef; model?: RevisionRef; output_contract: 'summary-value@1' | 'data-statistics@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema;
     grant: { tools: string[]; mcp: []; inputs: InputBinding[]; external_access: 'model-only' }; deadline_at: string };
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out';
   phase: 'queued' | 'preparing' | 'executing' | 'terminal'; failure: Failure | null;
@@ -43,6 +44,8 @@ export interface RunEvent {
 }
 export interface SandboxPort {
   readonly source: string;
+  supports?(profile: Profile, purpose?: 'execute' | 'cleanup'): boolean;
+  sourceFor?(run: Run): string;
   prepare(run: Run): Promise<string>;
   loadInputs?(run: Run, inputs: LoadedInput[]): Promise<void>;
   execute(run: Run, signal: AbortSignal): Promise<unknown>;

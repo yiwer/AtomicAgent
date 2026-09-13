@@ -1,0 +1,2 @@
+{"check":"built-entrypoint-restart","mode":"fixture","result":"PASS","duplicate_process":"rejected","persisted_result":true}
+{"check":"configuration-publication-restart","mode":"fixture","result":"PASS","fixed_manifest":true,"command_replay":true,"disabled_new_admission":true,"legacy_run_replay":true}

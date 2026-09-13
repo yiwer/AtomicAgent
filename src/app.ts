@@ -11,8 +11,9 @@ import { DiskBlobs, type BlobPort } from './blob-store.js';
 import { fileSchema, ARTIFACT_LIMIT, INPUT_LIMIT } from './file-contract.js';
 import { contentDigest, manifestDigest, submissionDigest } from './submission.js';
 import { Events } from './events.js';
+import { Configurations } from './configurations.js';
 
-interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number }
+interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string }[] }
 const digest = (value: string) => createHash('sha256').update(value).digest();
 function publicRun(run: Run) {
   return {
@@ -21,7 +22,7 @@ function publicRun(run: Run) {
     submission_digest: submissionDigest(run),
     cleanup: run.cleanup, validation: run.validation,
     inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded }) => ({ file_id, path, sha256, size_bytes, loaded })),
-    execution: { manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
+    execution: { environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
       sdk: run.manifest.profile.sdk, cli: run.manifest.profile.cli, node: run.manifest.profile.node,
       image: run.manifest.profile.image, deadline_at: run.manifest.deadline_at, output_contract: run.manifest.output_contract },
   };
@@ -50,16 +51,22 @@ function sessionId(request: IncomingMessage) {
 export async function createApp(options: AppOptions) {
   options = { ...options, profile: structuredClone(options.profile), identities: structuredClone(options.identities) };
   validateProfile(options.profile);
-  if (options.sandbox.source !== (options.profile.mode === 'fixture' ? 'deterministic-fixture' : 'opensandbox')) throw new Error('profile_adapter_mismatch');
+  if (options.sandbox.supports ? ![options.profile, ...(options.approvedProfiles ?? [])].every(p => options.sandbox.supports!(p)) : ![options.profile, ...(options.approvedProfiles ?? [])].every(p => options.sandbox.source === (p.mode === 'fixture' ? 'deterministic-fixture' : 'opensandbox'))) throw new Error('profile_adapter_mismatch');
   if (options.identities.length === 0 || options.identities.some(i => i.token.length < 32 || !['caller', 'maintainer', 'health'].includes(i.role) ||
       !/^[\w.-]{1,80}$/.test(i.actor) || !/^[\w.-]{1,80}$/.test(i.workspace)) ||
       new Set(options.identities.map(i => i.token)).size !== options.identities.length) throw new Error('invalid_identity_configuration');
   const store = new Store(options.database);
-  try { store.registerProfile(options.profile); } catch (error) { store.close(); throw error; }
+  try {
+    for (const profile of [options.profile, ...(options.approvedProfiles ?? [])]) { validateProfile(profile); store.registerProfile(profile); }
+    for (const binding of options.deploymentBindings ?? []) store.registerDeploymentBinding(binding.id, binding.document);
+  } catch (error) { store.close(); throw error; }
   const files = new Files(store, options.blobs ?? new DiskBlobs(`${options.database}.objects`));
   await files.recover();
   const worker = new Worker(store, options.sandbox, files);
   try { await worker.recover(); store.initializeEvents(); } catch (error) { store.close(); throw error; }
+  let configurations: Configurations;
+  try { configurations = new Configurations(store, options.profile, [options.profile, ...(options.approvedProfiles ?? [])], [...new Set(options.identities.map(i => i.workspace))]); }
+  catch (error) { store.close(); throw error; }
   worker.wake();
   // Observation/session clock is an external test seam; it never sets execution deadlines.
   const clock = options.clock ?? Date.now;
@@ -115,12 +122,13 @@ export async function createApp(options: AppOptions) {
     response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     let identity: Identity | undefined;
     let submissionNotAccepted = false;
+    let configurationNotApplied = false;
     try {
       const path = new URL(request.url ?? '/', 'http://localhost').pathname;
       const method = request.method ?? 'GET';
       if (method === 'POST' && request.headers.origin && request.headers.origin !== `http://${request.headers.host}` && request.headers.origin !== `https://${request.headers.host}`)
         throw new ApiError(403, 'origin_denied');
-      if (method === 'GET' && ['/', '/app.js', '/events.js', '/styles.css'].includes(path)) {
+      if (method === 'GET' && ['/', '/app.js', '/events.js', '/configurations.js', '/styles.css'].includes(path)) {
         const file = path === '/' ? 'index.html' : path.slice(1);
         const contents = await readFile(resolve('web', file));
         response.writeHead(200, { 'Content-Type': file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
@@ -154,7 +162,7 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-04', submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-05', configurations: configurations.observation(identity.workspace), submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -163,6 +171,26 @@ export async function createApp(options: AppOptions) {
         }); return;
       }
       if (identity.role === 'health') throw new ApiError(403, 'forbidden');
+      if (path === '/v1/configurations' && method === 'GET') {
+        send(response, 200, configurations.list(identity)); return;
+      }
+      if (path === '/v1/configurations/audit' && method === 'GET') {
+        if (identity.role !== 'maintainer') throw new ApiError(403, 'forbidden');
+        store.audit(identity.actor, identity.workspace, 'configuration.audit-read', 'allowed');
+        send(response, 200, { records: store.configurationAudit(identity.workspace), observed_at: now(), source: 'platform:durable-configuration-audit', limit: 100 }); return;
+      }
+      if (['/v1/configurations/preview', '/v1/configurations/commands'].includes(path) && method === 'POST') {
+        if (identity.role !== 'maintainer') throw new ApiError(403, 'forbidden');
+        const expectedActor = request.headers['x-configuration-actor'], expectedWorkspace = request.headers['x-configuration-workspace'];
+        if ((expectedActor !== undefined || expectedWorkspace !== undefined) &&
+            (expectedActor !== identity.actor || expectedWorkspace !== identity.workspace)) throw new ApiError(403, 'configuration_identity_changed');
+        const input = await body(request);
+        if (path.endsWith('/preview')) { send(response, 200, configurations.preview(identity, input)); return; }
+        const key = request.headers['idempotency-key'];
+        if (typeof key !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(key)) throw new ApiError(400, 'command_id_required');
+        configurationNotApplied = !store.configurationCommand(identity.workspace, identity.actor, key);
+        send(response, 200, configurations.execute(identity, input, key)); configurationNotApplied = false; return;
+      }
       if (path === '/v1/files' && method === 'POST') {
         let input: Record<string, unknown>;
         if (request.headers['x-file-format']) {
@@ -192,7 +220,7 @@ export async function createApp(options: AppOptions) {
         const input = record(await body(request));
         const key = request.headers['idempotency-key'];
         if (typeof key !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(key)) throw new ApiError(400, 'idempotency_key_required');
-        if (Object.keys(input).some(k => !['prompt', 'profile', 'output_contract', 'inputs'].includes(k)) ||
+        if (Object.keys(input).some(k => !['prompt', 'profile', 'environment', 'model', 'output_contract', 'inputs'].includes(k)) ||
             typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 8000) throw new ApiError(400, 'invalid_request');
         const requestDigest = contentDigest(input);
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
@@ -200,7 +228,7 @@ export async function createApp(options: AppOptions) {
         if (replay) { await replySubmission(request, response, replay, waitSeconds); return; }
         // Only this confirmed absent binding can authorize discarding a rejected pending submission.
         submissionNotAccepted = true;
-        if (input.profile !== options.profile.id) throw new ApiError(400, 'config_unavailable');
+        const resolved = configurations.resolve(identity.workspace, input);
         if (!['summary-value@1', 'data-statistics@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
         const bindings = input.output_contract === 'data-statistics@1' ? files.bind(identity, input.inputs) : [];
         if (input.output_contract === 'summary-value@1' && input.inputs !== undefined) throw new ApiError(400, 'invalid_request');
@@ -208,9 +236,9 @@ export async function createApp(options: AppOptions) {
         const run: Run = {
           run_id: randomUUID(), owner: identity.actor, workspace: identity.workspace, prompt: input.prompt,
           request_digest: requestDigest, request_digest_version: 2,
-          manifest: { profile: structuredClone(options.profile), output_contract: input.output_contract as Run['manifest']['output_contract'], schema: bindings.length ? fileSchema : outputSchema,
+          manifest: { ...resolved, output_contract: input.output_contract as Run['manifest']['output_contract'], schema: bindings.length ? fileSchema : outputSchema,
             grant: { tools: bindings.length ? ['process-data@1'] : [], mcp: [], inputs: bindings, external_access: 'model-only' },
-            deadline_at: new Date(Date.now() + options.profile.timeout_seconds * 1000).toISOString() },
+            deadline_at: new Date(Date.now() + resolved.profile.timeout_seconds * 1000).toISOString() },
           status: 'queued', phase: 'queued', failure: null, accepted_at: acceptedAt, terminal_at: null, attempt_id: null,
           allocation: null, cleanup: { status: 'pending', observed_at: null, source: null }, validation: null, result: null,
         };
@@ -277,9 +305,16 @@ export async function createApp(options: AppOptions) {
     } catch (error) {
       const status = error instanceof ApiError ? error.status : 503;
       const code = error instanceof ApiError ? error.code : 'service_unavailable';
-      try { store.audit(identity?.actor ?? 'unauthenticated', identity?.workspace ?? null, 'request.reject', code); } catch { /* fail closed */ }
+      try {
+        const configuration = new URL(request.url ?? '/', 'http://localhost').pathname.startsWith('/v1/configurations');
+        const key = request.headers['idempotency-key'];
+        store.audit(identity?.actor ?? 'unauthenticated', identity?.workspace ?? null, configuration ? 'configuration.reject' : 'request.reject', code, null,
+          configuration ? { source: 'platform:configuration-command', resource_id: null,
+            operation_id: typeof key === 'string' && /^[\x21-\x7e]{1,128}$/.test(key) ? key : null, observed_at: now() } : undefined);
+      } catch { /* fail closed */ }
       if (!response.headersSent) send(response, status, { error: code,
         ...(code === 'event_cursor_expired' || code === 'event_cursor_ahead' ? { recovery: 'query_run', run_url: new URL(request.url!, 'http://localhost').pathname.replace(/\/events$/, '') } : {}),
+        ...(configurationNotApplied && status >= 400 && status < 500 ? { command_status: 'not_applied' } : {}),
         ...(submissionNotAccepted && status >= 400 && status < 500 ? { submission_status: 'not_accepted' } : {}) }); else response.end();
     }
   });

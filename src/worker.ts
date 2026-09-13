@@ -89,7 +89,7 @@ export class Worker {
       if (executing.manifest.output_contract === 'data-statistics@1') {
         const validated = validateFiles(result, inputs[0]!); candidate = validated.result;
         this.store.audit('platform', executing.workspace, 'tool.process-data-observed', 'completed', executing.run_id,
-          { source: this.sandbox.source, resource_id: executing.allocation!.resource_id, operation_id: executing.attempt_id, observed_at: now() });
+          { source: this.sandbox.sourceFor?.(executing) ?? this.sandbox.source, resource_id: executing.allocation!.resource_id, operation_id: executing.attempt_id, observed_at: now() });
         phase = 'committing';
         staged = await beforeDeadline(this.files.stage(executing, validated.files, controller.signal), controller.signal);
       } else if (!validates(result)) throw new TaskError('output_invalid');
@@ -111,7 +111,7 @@ export class Worker {
     try { status = !run.allocation || await this.sandbox.cleanup(run) === 'absent' ? 'complete' : 'unknown'; }
     catch { status = 'failed'; }
     const observedAt = now();
-    const source = run.allocation ? this.sandbox.source : 'platform:no-create-intent';
+    const source = run.allocation ? (this.sandbox.sourceFor?.(run) ?? this.sandbox.source) : 'platform:no-create-intent';
     this.store.change(run.run_id, 'sandbox.cleanup-observed', r => {
       r.cleanup = { status, observed_at: observedAt, source };
     }, { outcome: status, evidence: { source, observed_at: observedAt,

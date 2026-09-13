@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { ApiError, now, type Profile, type Run, type RunEvent, type StoredObject } from './domain.js';
-import { submissionDigest } from './submission.js';
+import { manifestDigest, submissionDigest } from './submission.js';
 
 interface AuditEvidence { source: string; resource_id: string | null; operation_id: string | null; observed_at: string }
 
@@ -17,6 +17,9 @@ export class Store {
       CREATE TABLE IF NOT EXISTS objects(id TEXT PRIMARY KEY, document TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS run_events(run_id TEXT NOT NULL, sequence INTEGER NOT NULL, document TEXT NOT NULL,
         PRIMARY KEY(run_id,sequence));
+      CREATE TABLE IF NOT EXISTS configuration_state(workspace TEXT PRIMARY KEY, document TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS configuration_commands(workspace TEXT NOT NULL, actor TEXT NOT NULL, command_id TEXT NOT NULL, digest TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(workspace,actor,command_id));
+      CREATE TABLE IF NOT EXISTS deployment_bindings(id TEXT PRIMARY KEY, document TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS registered_profile(id TEXT PRIMARY KEY, document TEXT NOT NULL);`);
     const columns = this.db.prepare('PRAGMA table_info(audit)').all().map(row => row.name);
     for (const column of ['source', 'resource_id', 'operation_id', 'observed_at']) {
@@ -29,7 +32,7 @@ export class Store {
     if (existing && existing.document !== document) throw new Error('immutable_profile_conflict');
     // Matching registrations need no writes: a read-capable database must still permit disposal during a write outage.
     for (const run of this.all()) {
-      if (JSON.stringify(run.manifest.profile, Object.keys(run.manifest.profile).sort()) !== document) throw new Error('immutable_profile_conflict');
+      if (run.manifest.profile.id === profile.id && JSON.stringify(run.manifest.profile, Object.keys(run.manifest.profile).sort()) !== document) throw new Error('immutable_profile_conflict');
     }
     if (existing) return;
     this.transaction(() => {
@@ -40,6 +43,31 @@ export class Store {
         this.audit('platform', null, 'profile.register', 'fixed-revision');
       }
     });
+  }
+  registerDeploymentBinding(id: string, document: string) {
+    const existing = this.db.prepare('SELECT document FROM deployment_bindings WHERE id=?').get(id);
+    if (existing) { if (existing.document !== document) throw new Error('immutable_deployment_binding_conflict'); return; }
+    this.transaction(() => {
+      this.db.prepare('INSERT INTO deployment_bindings VALUES(?,?)').run(id, document);
+      this.audit('platform', null, 'binding.register', 'fixed-identity');
+    });
+  }
+  configurationState(workspace: string): unknown {
+    const row = this.db.prepare('SELECT document FROM configuration_state WHERE workspace=?').get(workspace);
+    return row ? JSON.parse(row.document as string) : undefined;
+  }
+  saveConfigurationState(workspace: string, state: unknown) {
+    this.db.prepare('INSERT INTO configuration_state VALUES(?,?) ON CONFLICT(workspace) DO UPDATE SET document=excluded.document').run(workspace, JSON.stringify(state));
+  }
+  configurationCommand(workspace: string, actor: string, key: string): { digest: string; receipt: unknown } | undefined {
+    const row = this.db.prepare('SELECT digest,document FROM configuration_commands WHERE workspace=? AND actor=? AND command_id=?').get(workspace, actor, key);
+    return row ? { digest: row.digest as string, receipt: JSON.parse(row.document as string) } : undefined;
+  }
+  saveConfigurationCommand(workspace: string, actor: string, key: string, digest: string, receipt: unknown) {
+    this.db.prepare('INSERT INTO configuration_commands VALUES(?,?,?,?,?)').run(workspace, actor, key, digest, JSON.stringify(receipt));
+  }
+  configurationAudit(workspace: string) {
+    return this.db.prepare("SELECT actor,action,outcome,recorded_at,resource_id,operation_id,source FROM audit WHERE workspace=? AND action LIKE 'configuration.%' ORDER BY seq DESC LIMIT 100").all(workspace);
   }
   transaction<T>(operation: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
@@ -100,7 +128,9 @@ export class Store {
     return this.transaction(() => {
       const run = this.get(id)!;
       const previous = JSON.stringify(this.progress(run));
+      const frozenManifest = manifestDigest(run.manifest);
       update(run);
+      if (manifestDigest(run.manifest) !== frozenManifest) throw new Error('immutable_manifest_conflict');
       this.db.prepare('UPDATE runs SET document=? WHERE id=?').run(JSON.stringify(run), id);
       this.audit('platform', run.workspace, action, observation?.outcome ?? run.failure ?? run.status, id, observation?.evidence);
       if (JSON.stringify(this.progress(run)) !== previous) this.appendEvent(run);

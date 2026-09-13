@@ -6,7 +6,7 @@ export const fixtureProfile: Profile = {
   runtime: 'docker', timeout_seconds: 60, approval_ref: 'deterministic-test-only',
 };
 export function validateProfile(profile: Profile): void {
-  if (profile.id !== 'json-lab@1' || profile.revision !== '1' || profile.runtime !== 'docker' ||
+  if (!/^[-a-zA-Z0-9_.]{1,80}@[1-9][0-9]{0,6}$/.test(profile.id) || profile.revision !== profile.id.split('@')[1] || profile.runtime !== 'docker' ||
       !Number.isInteger(profile.timeout_seconds) || profile.timeout_seconds < 1 || profile.timeout_seconds > 3600) {
     throw new ApiError(503, 'invalid_profile');
   }

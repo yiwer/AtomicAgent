@@ -47,6 +47,22 @@ try {
     if (i === 99) throw new Error('run_not_complete');
     await new Promise(resolve => setTimeout(resolve, 20));
   }
+  const catalog = await (await fetch(current.url + '/v1/configurations', { headers })).json();
+  const publication = { action: 'publish', kind: 'environment', name: 'json-lab', expected_generation: 1, reason: 'Built entrypoint revision audit',
+    content: { binding_ref: catalog.bindings.environments[0].binding_ref, image: fixtureProfile.image, timeout_seconds: 30 } };
+  const preview = await (await fetch(current.url + '/v1/configurations/preview', { method: 'POST', headers, body: JSON.stringify(publication) })).json();
+  const commandBody = JSON.stringify({ ...publication, preview_digest: preview.preview_digest });
+  const commandHeaders = { ...headers, 'Idempotency-Key': 'configuration-publication' };
+  const published = await (await fetch(current.url + '/v1/configurations/commands', { method: 'POST', headers: commandHeaders, body: commandBody })).json();
+  assert.equal(published.revision.version, '2');
+  const task = { prompt: 'Return three apples and integer 3.', environment: { profile_id: 'json-lab', version: '2' },
+    model: { profile_id: 'json-lab', version: '1' }, output_contract: 'summary-value@1' };
+  const fixed = await (await fetch(current.url + '/v1/runs?wait_seconds=5', { method: 'POST', headers: { ...headers, 'Idempotency-Key': 'fixed-revision' }, body: JSON.stringify(task) })).json();
+  assert.equal(fixed.status, 'succeeded'); assert.deepEqual(fixed.execution.environment, task.environment);
+  const disable = { action: 'disable', kind: 'environment', name: 'json-lab', version: '1', expected_generation: 2, reason: 'Only new admission is disabled' };
+  const disablePreview = await (await fetch(current.url + '/v1/configurations/preview', { method: 'POST', headers, body: JSON.stringify(disable) })).json();
+  assert.equal((await fetch(current.url + '/v1/configurations/commands', { method: 'POST', headers: { ...headers, 'Idempotency-Key': 'disable-original' },
+    body: JSON.stringify({ ...disable, preview_digest: disablePreview.preview_digest }) })).status, 200);
   const duplicate = spawn(process.execPath, ['dist/src/main.js'], { env: { ...process.env, ATOMIC_CONFIG: configPath }, windowsHide: true, stdio: 'ignore' });
   const code = await new Promise<number | null>((resolve, reject) => {
     const timer = setTimeout(() => { duplicate.kill('SIGTERM'); }, 10_000);
@@ -56,5 +72,13 @@ try {
   await stop(current); current = undefined; current = await launch();
   const result = await (await fetch(`${current.url}/v1/runs/${accepted.run_id}/result`, { headers })).json();
   assert.deepEqual(result.result, { summary: 'three apples', value: 3 });
+  assert.deepEqual(await (await fetch(current.url + '/v1/configurations/commands', { method: 'POST', headers: commandHeaders, body: commandBody })).json(), published);
+  const frozen = await (await fetch(`${current.url}/v1/runs/${fixed.run_id}`, { headers })).json();
+  assert.equal(frozen.execution.manifest_digest, fixed.execution.manifest_digest);
+  const legacyBody = JSON.stringify({ prompt: 'Return three apples and integer 3.', profile: 'json-lab@1', output_contract: 'summary-value@1' });
+  const replay = await (await fetch(current.url + '/v1/runs', { method: 'POST', headers, body: legacyBody })).json();
+  assert.equal(replay.run_id, accepted.run_id);
+  assert.equal((await fetch(current.url + '/v1/runs', { method: 'POST', headers: { ...headers, 'Idempotency-Key': 'new-disabled' }, body: legacyBody })).status, 400);
   console.log(JSON.stringify({ check: 'built-entrypoint-restart', mode: 'fixture', result: 'PASS', duplicate_process: 'rejected', persisted_result: true }));
+  console.log(JSON.stringify({ check: 'configuration-publication-restart', mode: 'fixture', result: 'PASS', fixed_manifest: true, command_replay: true, disabled_new_admission: true, legacy_run_replay: true }));
 } finally { if (current) await stop(current); await rm(directory, { recursive: true, force: true }); }

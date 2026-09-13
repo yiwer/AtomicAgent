@@ -1,9 +1,11 @@
+import { configurationPanel } from './configurations.js';
 import { observeRun } from './events.js';
 const $ = id => document.getElementById(id);
 const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
-const errorText = { authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', submission_identity_changed: '登录身份已变化，请重新登录原身份后找回提交。', config_unavailable: '登记配置不可用。', idempotency_conflict: '原提交标识已绑定其他内容；已保留恢复材料，请核对原提交。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
+const errorText = { configuration_identity_changed: '登录身份已变化；请登录原身份找回配置操作。', configuration_conflict: '配置已被其他操作更新。请打开最新修订并重新预览。', configuration_preview_required: '请重新预览当前配置后再发布。', binding_not_allowed: '所选配置超过服务端登记的允许范围。', configuration_command_conflict: '此操作标识已绑定其他内容，请保留原操作材料核对。', authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', submission_identity_changed: '登录身份已变化，请重新登录原身份后找回提交。', config_unavailable: '登记配置不可用。', idempotency_conflict: '原提交标识已绑定其他内容；已保留恢复材料，请核对原提交。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
 let me = null, selected = null, loading = false, pending = null, uploaded = null;
 let observation = null;
+const configurations = configurationPanel({ api, identity: () => me });
 function stopObservation() { observation?.stop(); observation = null; }
 function ensureObservation(id, identity) {
   if (observation?.id === id && observation.identity === identity) return;
@@ -20,8 +22,8 @@ async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const data = await response.json();
   if (!response.ok) {
-    if (response.status === 401 || data.error === 'submission_identity_changed') loggedOut();
-    throw Object.assign(new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`), { submissionStatus: data.submission_status });
+    if (response.status === 401 || ['submission_identity_changed', 'configuration_identity_changed'].includes(data.error)) loggedOut();
+    throw Object.assign(new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`), { submissionStatus: data.submission_status, commandStatus: data.command_status });
   }
   return data;
 }
@@ -51,6 +53,7 @@ async function submitPending() {
   } finally { $('recover-submission').disabled = false; renderPending(); }
 }
 function loggedOut() {
+  configurations.logout();
   stopObservation();
   me = null; selected = null; uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
@@ -95,6 +98,7 @@ async function refresh() {
   loading = true; const identity = me;
   try {
     if (me.role !== 'health') {
+      await configurations.refresh(); if (me !== identity) return;
       const data = await api('/v1/runs'); if (me !== identity) return;
       $('runs').replaceChildren(); $('empty').hidden = data.runs.length > 0;
       for (const run of data.runs) {
@@ -119,10 +123,11 @@ async function refresh() {
 }
 async function connect() {
   me = await api('/v1/me'); $('login').hidden = true; $('workspace').hidden = false; $('logout').hidden = false; $('refresh').hidden = false;
+  configurations.connect();
   pending = JSON.parse(sessionStorage.getItem(pendingStorageKey(me)) ?? 'null'); renderPending();
   $('identity').textContent = `${me.workspace} / ${me.actor} · ${me.role}`; $('nav-workspace').textContent = me.workspace;
   $('profile').textContent = me.profile;
-  $('mode').textContent = me.mode === 'fixture' ? '确定性实验模式：任务经过真实 API 与持久化；执行端为受控替身；文件任务运行本地真实代码，不调用模型，也不创建 Docker 资源。' : '真实实验模式：使用服务端登记的 OpenSandbox 与模型配置。';
+
   $('submission').hidden = me.role === 'health'; $('run-list').hidden = me.role === 'health';
   const hash = location.hash.slice(1); selected = /^[a-f0-9-]{36}$/.test(hash) ? hash : null;
   await refresh();
@@ -137,7 +142,7 @@ $('submit-form').addEventListener('submit', async event => {
     if (pending) { await submitPending(); return; }
     if (!$('prompt').value.trim()) throw new Error('请填写非空任务提示词。');
     if ($('input-file').files.length && !uploaded) throw new Error('请先上传并校验输入文件。');
-    const request = { prompt: $('prompt').value, profile: me.profile, output_contract: uploaded ? 'data-statistics@1' : me.output_contract,
+    const request = { prompt: $('prompt').value, ...configurations.selection(), output_contract: uploaded ? 'data-statistics@1' : me.output_contract,
       ...(uploaded ? { inputs: [{ file_id: uploaded.file_id, path: `input/data.${uploaded.format}` }] } : {}) };
     const submission = { key: crypto.randomUUID(), body: JSON.stringify(request) };
     sessionStorage.setItem(pendingStorageKey(me), JSON.stringify(submission));
