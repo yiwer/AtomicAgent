@@ -233,3 +233,14 @@ test('raw file upload validates UTF-8 and enforces the 50 MiB byte limit indepen
   assert.equal((await l.uploadRaw(Buffer.from([0xff, 0xfe]))).status, 400);
   assert.equal((await l.uploadRaw(Buffer.alloc(50 * 1024 * 1024 + 1, 120))).status, 413);
 });
+
+test('upload audit preserves the authenticated initiator separately from platform validation', async t => {
+  const l = await lab(t);
+  const file = await (await l.request('/v1/files', { format: 'csv', content: csv })).json();
+  const db = new DatabaseSync(join(l.directory, 'runs.db'));
+  try {
+    const record = db.prepare("SELECT actor,source,resource_id FROM audit WHERE action='input.upload-intent'").get();
+    assert.equal(record?.actor, 'a'); assert.equal(record?.resource_id, file.file_id); assert.equal(record?.source, 'platform:object-store');
+    assert.equal(db.prepare("SELECT actor FROM audit WHERE action='input.validated'").get()?.actor, 'platform');
+  } finally { db.close(); }
+});

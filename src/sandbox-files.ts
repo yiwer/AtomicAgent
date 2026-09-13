@@ -1,3 +1,4 @@
+import { readBounded } from './bounded-file.js';
 import { lstat, open } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
@@ -14,11 +15,7 @@ export async function readSandboxFile(root: string, relative: string, limit: num
     if (info.isSymbolicLink()) throw new TaskError('output_invalid');
   }
   const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-  try {
-    const stat = await file.stat(); if (!stat.isFile() || stat.size > limit) throw new TaskError('output_invalid');
-    const bytes = Buffer.alloc(stat.size); let offset = 0;
-    while (offset < bytes.length) { const { bytesRead } = await file.read(bytes, offset, bytes.length - offset, offset); if (!bytesRead) throw new TaskError('output_invalid'); offset += bytesRead; }
-    return bytes;
+  try { return await readBounded(file, limit);
   } finally { await file.close(); }
 }
 export async function collectFiles(root: string, candidate: unknown): Promise<FileCandidate> {

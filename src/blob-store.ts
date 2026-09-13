@@ -1,3 +1,4 @@
+import { readBounded } from './bounded-file.js';
 import { mkdir, lstat, open, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -26,12 +27,7 @@ export class DiskBlobs implements BlobPort {
     const path = await this.path(id); const info = await lstat(path);
     if (!info.isFile() || info.isSymbolicLink() || info.size > maxBytes) throw new Error('unsafe_blob');
     const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-    try {
-      const stat = await file.stat();
-      if (!stat.isFile() || stat.size > maxBytes) throw new Error('unsafe_blob');
-      const bytes = Buffer.alloc(stat.size); let offset = 0;
-      while (offset < bytes.length) { const { bytesRead } = await file.read(bytes, offset, bytes.length - offset, offset); if (!bytesRead) throw new Error('incomplete_blob'); offset += bytesRead; }
-      return bytes;
+    try { return await readBounded(file, maxBytes);
     } finally { await file.close(); }
   }
   async remove(id: string) {

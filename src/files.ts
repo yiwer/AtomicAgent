@@ -31,7 +31,7 @@ export class Files {
     const object: StoredObject = { object_id: randomUUID(), kind: 'input', owner: identity.actor, workspace: identity.workspace,
       run_id: null, path: null, format: value.format as 'csv' | 'json', size_bytes: bytes.length, sha256: sha256(bytes),
       status: 'staged', expires_at: new Date(Date.now() + 86400_000).toISOString(), cleanup_observed_at: null };
-    this.store.transaction(() => { this.store.saveObject(object); this.audit(object, 'input.upload-intent', 'staged'); });
+    this.store.transaction(() => { this.store.saveObject(object); this.audit(object, 'input.upload-intent', 'staged', identity.actor); });
     try {
       await this.blobs.write(object.object_id, bytes);
       const stored = await this.blobs.read(object.object_id, INPUT_LIMIT);
