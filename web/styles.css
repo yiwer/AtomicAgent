@@ -6,3 +6,5 @@ label:has(#skills-must-use) { display: flex; align-items: center; gap: 0.65rem; 
 #skills-must-use { width: 18px; height: 18px; margin: 0; flex: 0 0 auto; }
 #skill-revisions { min-height: 64px; }
 #skill-evidence p { overflow-wrap: anywhere; line-height: 1.7; }
+
+.input-binding { overflow-wrap: anywhere; }

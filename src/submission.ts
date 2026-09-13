@@ -19,5 +19,5 @@ export function submissionDigest(run: Run): string {
 
 export function manifestDigest(manifest: Run['manifest']): string {
   return contentDigest({ ...manifest, grant: { ...manifest.grant,
-    inputs: manifest.grant.inputs.map(({ loaded: _loaded, ...binding }) => binding) } });
+    inputs: manifest.grant.inputs.map(({ loaded: _loaded, loaded_at: _loadedAt, ...binding }) => binding) } });
 }

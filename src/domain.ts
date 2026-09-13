@@ -15,7 +15,7 @@ export const outputSchema = {
   required: ['summary', 'value'], additionalProperties: false,
 } as const;
 export type Failure = 'provisioning_failed' | 'runtime_failed' | 'output_invalid' | 'input_required' |
-  'authorization_required' | 'execution_lost' | 'deadline_exceeded' | 'artifact_commit_failed' | 'required_capability_failed' | 'skill_use_unproven';
+  'authorization_required' | 'execution_lost' | 'deadline_exceeded' | 'artifact_commit_failed' | 'required_capability_failed' | 'skill_use_unproven' | 'input_source_expired' | 'input_copy_failed';
 export class TaskError extends Error {
   constructor(public code: Failure) { super(code); }
 }
@@ -63,6 +63,8 @@ export interface StoredObject {
   expires_at: string; cleanup_observed_at: string | null;
 }
 export interface InputBinding {
+  binding_id?: string; loaded_at?: string;
+  source?: { kind: 'artifact'; artifact_id: string; run_id: string; expires_at: string };
   file_id: string; path: string; sha256: string; size_bytes: number; format: 'csv' | 'json';
   owner: string; workspace: string; expires_at: string; loaded: boolean;
 }

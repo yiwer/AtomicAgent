@@ -33,3 +33,5 @@
 ## Comments
 
 - 2026-09-14：根据用户“接受”发布；尚未开始产品实现或验收。
+
+- 2026-09-14：已实现 API / A 的显式 Artifact 复用、固定 InputBinding、独立 sandbox 副本及 TTL / 复制故障边界。实现和分层证据见 [ticket08](../../../../docs/implementation/ticket08.md)；代码验证中，真实两次模型任务与 Linux / 人工综合 AC 仍待授权输入，验收不勾选。

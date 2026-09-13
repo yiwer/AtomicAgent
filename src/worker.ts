@@ -77,8 +77,10 @@ export class Worker {
       const inputs = await beforeDeadline(this.files.load(prepared), controller.signal);
       if (inputs.length) {
         if (!this.sandbox.loadInputs) throw new TaskError('provisioning_failed');
-        await beforeDeadline(this.sandbox.loadInputs(prepared, inputs), controller.signal);
-        this.store.change(prepared.run_id, 'input.loaded', r => { for (const binding of r.manifest.grant.inputs) binding.loaded = true; });
+        try { await beforeDeadline(this.sandbox.loadInputs(prepared, inputs), controller.signal); }
+        catch (error) { if (inputs.some(i => i.binding.source) && !(error instanceof TaskError && error.code === 'deadline_exceeded')) throw new TaskError('input_copy_failed'); throw error; }
+        await beforeDeadline(this.files.confirmCopies(prepared), controller.signal);
+        this.store.change(prepared.run_id, 'input.loaded', r => { for (const binding of r.manifest.grant.inputs) { binding.loaded = true; binding.loaded_at = now(); } });
       }
       phase = 'executing';
       const executing = this.store.change(prepared.run_id, 'attempt.start-intent', r => {

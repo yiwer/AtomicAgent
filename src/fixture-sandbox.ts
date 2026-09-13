@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { collectFiles } from './sandbox-files.js';
+import { INPUT_LIMIT } from './file-contract.js';
+import { sha256 } from './files.js';
+import { readSandboxFile, collectFiles } from './sandbox-files.js';
 import { TaskError, type Run, type SandboxPort, type LoadedInput } from './domain.js';
 // Explicit external-system double. Never selected by a live profile or by user prompt.
 export class FixtureSandbox implements SandboxPort {
@@ -24,7 +26,11 @@ export class FixtureSandbox implements SandboxPort {
   async loadInputs(run: Run, inputs: LoadedInput[]) {
     const root = await mkdtemp(join(tmpdir(), 'atomicagent-execution-')); this.directories.set(run.run_id, root);
     await mkdir(join(root, 'input'));
-    for (const input of inputs) await writeFile(join(root, input.binding.path), input.bytes, { flag: 'wx' });
+    for (const input of inputs) {
+      await writeFile(join(root, input.binding.path), input.bytes, { flag: 'wx' });
+      const copy = await readSandboxFile(root, input.binding.path, INPUT_LIMIT);
+      if (copy.length !== input.binding.size_bytes || sha256(copy) !== input.binding.sha256) throw new TaskError('input_required');
+    }
     await writeFile(join(root, 'request.json'), JSON.stringify({ input_path: inputs[0]!.binding.path, format: inputs[0]!.binding.format }));
   }
   async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown> {

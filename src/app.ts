@@ -23,7 +23,9 @@ function publicRun(run: Run) {
     accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
     submission_digest: submissionDigest(run),
     cleanup: run.cleanup, validation: run.validation, skills: run.skills ?? [], mcp: run.mcp ?? [],
-    inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded }) => ({ file_id, path, sha256, size_bytes, loaded })),
+    inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded, binding_id, source, loaded_at }) => ({ file_id, path, sha256, size_bytes, loaded, binding_id, source,
+      copy: { run_id: run.run_id, path, loaded_at: loaded_at ?? null, status: loaded ? (run.cleanup.status === 'complete' ? 'removed' : 'loaded') : 'unconfirmed',
+        cleanup_status: run.cleanup.status, observed_at: run.cleanup.observed_at, source: run.cleanup.source } })),
     execution: { mcp: run.manifest.grant.mcp.map(({ sources, ...b }) => ({ ...b, sources: sources.map(({ snapshot, ...source }) => source) })), skills: (run.manifest.skills ?? []).map(({ id, version, must_use, entry, content_digest }) => ({ id, version, must_use, entry, content_digest })), environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
       sdk: run.manifest.profile.sdk, cli: run.manifest.profile.cli, node: run.manifest.profile.node,
       image: run.manifest.profile.image, deadline_at: run.manifest.deadline_at, output_contract: run.manifest.output_contract },
@@ -164,7 +166,7 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-07', configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-08', configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, artifact_reuse: { source: 'platform:durable-input-bindings', observed_at: now(), coverage: 'artifact-copy-confirmation-and-run-cleanup', requested: runs.filter(r => r.manifest.grant.inputs.some(i => i.source)).length, confirmed: runs.filter(r => r.manifest.grant.inputs.some(i => i.source && i.loaded)).length, copy_failed: runs.filter(r => r.failure === 'input_copy_failed').length, source_expired: runs.filter(r => r.failure === 'input_source_expired').length, cleanup_unfinished: runs.filter(r => r.terminal_at && r.manifest.grant.inputs.some(i => i.source) && r.cleanup.status !== 'complete').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -236,6 +238,16 @@ export async function createApp(options: AppOptions) {
         if (replay) { await replySubmission(request, response, replay, waitSeconds); return; }
         // Only this confirmed absent binding can authorize discarding a rejected pending submission.
         submissionNotAccepted = true;
+        let bindings: Run['manifest']['grant']['inputs'];
+        try { bindings = input.output_contract === 'data-statistics@1' ? await files.bind(identity, input.inputs) : []; }
+        catch (error) {
+          // Another identical request may have committed while source IO was in flight.
+          const concurrent = store.replay(identity.actor, identity.workspace, key, requestDigest);
+          if (concurrent) { submissionNotAccepted = false; await replySubmission(request, response, concurrent, waitSeconds); return; }
+          throw error;
+        }
+        const concurrent = store.replay(identity.actor, identity.workspace, key, requestDigest);
+        if (concurrent) { submissionNotAccepted = false; await replySubmission(request, response, concurrent, waitSeconds); return; }
         const resolved = configurations.resolve(identity.workspace, input);
         if (!['summary-value@1', 'data-statistics@1', 'research-report@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
         const mcp = configurations.resolveMcp(identity.workspace, input.mcp);
@@ -244,7 +256,6 @@ export async function createApp(options: AppOptions) {
         if (mcp.length && resolved.profile.mode === 'fixture' && mcp[0]!.mode !== 'snapshot') throw new ApiError(400, 'mcp_mode_unavailable');
         const skills = configurations.resolveSkills(identity.workspace, input.skills);
         if (skills.length && input.output_contract !== 'data-statistics@1') throw new ApiError(400, 'skill_contract_unavailable');
-        const bindings = input.output_contract === 'data-statistics@1' ? files.bind(identity, input.inputs) : [];
         if (input.output_contract === 'summary-value@1' && input.inputs !== undefined) throw new ApiError(400, 'invalid_request');
         const acceptedAt = now();
         const run: Run = {

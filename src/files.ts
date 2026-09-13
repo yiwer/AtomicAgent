@@ -55,30 +55,60 @@ export class Files {
   async recover() {
     for (const object of this.store.objects()) if (object.status === 'staged') await this.discard(object);
   }
-  bind(identity: Identity, inputs: unknown): InputBinding[] {
+  async bind(identity: Identity, inputs: unknown): Promise<InputBinding[]> {
     if (!Array.isArray(inputs) || inputs.length !== 1) throw new ApiError(400, 'one_data_input_required');
-    const paths = new Set<string>();
-    return inputs.map(value => {
-      if (!value || typeof value !== 'object' || Object.keys(value).sort().join(',') !== 'file_id,path' ||
-          typeof value.file_id !== 'string' || !safeInputPath(value.path) || paths.has(value.path)) throw new ApiError(400, 'invalid_input_binding');
-      paths.add(value.path);
-      const object = this.authorized(value.file_id, identity, 'input'); this.available(object);
-      if (object.format === 'markdown' || !value.path.endsWith('.' + object.format)) throw new ApiError(400, 'input_format_mismatch');
-      return { file_id: object.object_id, path: value.path, sha256: object.sha256, size_bytes: object.size_bytes, format: object.format,
-        owner: object.owner, workspace: object.workspace, expires_at: object.expires_at, loaded: false };
-    });
+    return Promise.all(inputs.map(async value => {
+      if (!value || typeof value !== 'object' || !['file_id,path', 'artifact_id,path'].includes(Object.keys(value).sort().join(',')) ||
+          typeof (value.artifact_id ?? value.file_id) !== 'string' || !safeInputPath(value.path)) throw new ApiError(400, 'invalid_input_binding');
+      const kind = value.artifact_id ? 'artifact' : 'input';
+      const object = this.authorized(value.artifact_id ?? value.file_id, identity, kind); this.available(object);
+      if (object.size_bytes > INPUT_LIMIT) throw new ApiError(413, 'input_limit');
+      if (object.format === 'markdown') throw new ApiError(400, 'input_contract_incompatible');
+      if (!value.path.endsWith('.' + object.format)) throw new ApiError(400, 'input_format_mismatch');
+      const binding: InputBinding = { binding_id: randomUUID(), file_id: object.object_id, path: value.path, sha256: object.sha256,
+        size_bytes: object.size_bytes, format: object.format, owner: object.owner, workspace: object.workspace, expires_at: object.expires_at, loaded: false,
+        ...(kind === 'artifact' ? { source: { kind: 'artifact', artifact_id: object.object_id, run_id: object.run_id!, expires_at: object.expires_at } } : {}) };
+      if (kind === 'artifact') {
+        let bytes: Buffer;
+        try { bytes = await this.readBinding(binding); } catch (error) {
+          if (error instanceof TaskError && error.code === 'input_source_expired') throw new ApiError(410, 'file_expired');
+          throw new ApiError(409, 'file_incomplete');
+        }
+        try { parseRows(new TextDecoder('utf-8', { fatal: true }).decode(bytes), binding.format); }
+        catch { throw new ApiError(400, 'input_contract_incompatible'); }
+        this.available(this.authorized(object.object_id, identity, 'artifact'));
+      }
+      return binding;
+    }));
+  }
+  private checkBinding(binding: InputBinding) {
+    const object = this.store.object(binding.file_id);
+    if (!object || !safeInputPath(binding.path) || !binding.path.endsWith('.' + binding.format) || object.owner !== binding.owner || object.workspace !== binding.workspace ||
+        object.sha256 !== binding.sha256 || object.size_bytes !== binding.size_bytes || object.format !== binding.format || object.expires_at !== binding.expires_at ||
+        object.kind !== (binding.source ? 'artifact' : 'input') || (binding.source && (object.run_id !== binding.source.run_id || object.object_id !== binding.source.artifact_id)) ||
+        object.status !== 'available') throw new TaskError('input_required');
+    if (Date.parse(object.expires_at) <= Date.now()) throw new TaskError(binding.source ? 'input_source_expired' : 'input_required');
+    return object;
+  }
+  private async readBinding(binding: InputBinding) {
+    const object = this.checkBinding(binding);
+    let bytes: Buffer;
+    try {
+      bytes = await this.blobs.read(object.object_id, INPUT_LIMIT);
+      if (bytes.length !== binding.size_bytes || sha256(bytes) !== binding.sha256) throw new Error('input_integrity');
+    } catch { throw new TaskError('input_required'); }
+    this.checkBinding(binding);
+    return bytes;
   }
   async load(run: Run): Promise<LoadedInput[]> {
-    return Promise.all(run.manifest.grant.inputs.map(async binding => {
-      const object = this.store.object(binding.file_id);
-      if (!object || object.owner !== binding.owner || object.workspace !== binding.workspace ||
-          object.sha256 !== binding.sha256 || object.status !== 'available' || Date.parse(object.expires_at) <= Date.now()) throw new TaskError('input_required');
-      try {
-        const bytes = await this.blobs.read(object.object_id, INPUT_LIMIT);
-        if (bytes.length !== binding.size_bytes || sha256(bytes) !== binding.sha256) throw new Error('input_integrity');
-        return { binding, bytes };
-      } catch { throw new TaskError('input_required'); }
-    }));
+    return Promise.all(run.manifest.grant.inputs.map(async binding => ({ binding, bytes: await this.readBinding(binding) })));
+  }
+  // The copy becomes independent only after the adapter verifies bytes and the source is still valid.
+  async confirmCopies(run: Run) {
+    for (const binding of run.manifest.grant.inputs) {
+      if (binding.source) await this.readBinding(binding);
+      else this.checkBinding(binding);
+    }
   }
   async stage(run: Run, candidates: FileCandidate['files'], signal: AbortSignal): Promise<StoredObject[]> {
     const staged: StoredObject[] = []; let retries = 0;
