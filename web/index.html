@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AtomicAgent · 任务运行</title><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
+<body>
+  <aside class="sidebar"><div class="brand"><span class="symbol">A</span><span>AtomicAgent</span></div>
+    <div class="workspace" id="nav-workspace">尚未登录</div>
+    <p class="nav-label">运行管理</p><a href="/" class="nav-item active" aria-current="page">任务运行</a>
+    <span class="nav-item muted">运维总览 <small>未接入</small></span><span class="nav-item muted">资源回收 <small>未接入</small></span>
+    <p class="nav-label">能力与配置</p><span class="nav-item muted">环境与模型 <small>未接入</small></span><span class="nav-item muted">Skills · MCP <small>未接入</small></span>
+    <p class="nav-label">平台治理</p><span class="nav-item muted">权限与审计 <small>未接入</small></span>
+    <footer>独立任务 · 明确交付<br>v0 / ticket01</footer>
+  </aside>
+  <div class="layout"><header><span>工作区 / 任务运行</span><div><span id="identity">未登录</span><button id="logout" hidden>退出</button></div></header>
+    <main>
+      <div class="page-title"><div><p class="eyebrow">RUN WORKSPACE</p><h1>任务运行</h1><p class="muted">提交提示词，查看平台校验后的 JSON 与独立回收状态。</p></div><button id="refresh" hidden>刷新数据</button></div>
+      <p id="error" role="alert" hidden></p>
+      <section id="login" class="card login"><h2>连接工作区</h2><p>使用服务端登记的访问令牌登录。身份与权限由服务端确认。</p>
+        <form id="login-form"><label for="token">访问令牌</label><input id="token" type="password" autocomplete="off" required><button class="primary" type="submit">登录</button></form>
+      </section>
+      <div id="workspace" hidden>
+        <p id="mode" class="notice"></p>
+        <div class="content-grid"><div class="stack">
+          <section id="submission" class="card"><div class="section-head"><h2>新建任务</h2><span class="muted">固定契约 · summary + value</span></div>
+            <form id="submit-form"><label for="prompt">任务提示词</label><textarea id="prompt" rows="3" maxlength="8000" required>请仅返回 JSON：summary 为 "three apples"，value 为整数 3。</textarea>
+              <div class="form-foot"><small>只接受提示词。结果包含 summary 文本与 value 整数。</small><button class="primary" id="submit" type="submit">提交任务</button></div></form>
+          </section>
+          <section id="run-list" class="card"><div class="section-head"><h2>任务列表</h2><small id="updated">等待读取</small></div>
+            <div class="table-wrap"><table><thead><tr><th>任务 / 接受时间</th><th>业务状态</th><th>回收状态</th><th></th></tr></thead><tbody id="runs"></tbody></table></div>
+            <p id="empty" class="empty">尚无任务。提交后可在这里查看。</p>
+          </section>
+        </div><aside class="stack rail">
+          <section class="card"><div class="section-head"><h2>执行与观测</h2></div><div class="card-body"><dl><dt>登记环境</dt><dd id="profile">—</dd><dt>模型健康</dt><dd id="model-health">未知 · 尚无实时探测</dd></dl><p id="health" class="muted">等待授权数据</p></div></section>
+          <section class="card"><div class="card-body"><h2>状态如何解读</h2><p>业务成功表示结构化结果已经校验并持久提交。</p><p>回收完成表示资源已经核验不存在。回收失败或未知时，已提交结果仍可读取。</p></div></section>
+        </aside></div>
+      </div>
+    </main>
+  </div>
+  <dialog id="detail"><div class="detail-head"><div><p class="eyebrow">RUN DETAIL</p><h2>任务详情</h2></div><button id="close-detail" aria-label="关闭详情">关闭</button></div>
+    <p id="detail-id" class="mono"></p><dl id="facts"></dl><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>固定执行依据</h3><pre id="manifest"></pre>
+  </dialog>
+</body></html>

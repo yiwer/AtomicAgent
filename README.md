@@ -1,6 +1,8 @@
 # AtomicAgent
 
-基于 coding agent 的独立任务执行 API 平台。2026-09-14 已确认 v0＋A 运维管理台范围，并发布 33 张 tracer-bullet 本地实施票；产品实现、技术兼容性和运行验收待开展。
+基于 coding agent 的独立任务执行 API 平台。2026-09-14 已确认 v0＋A 运维管理台范围，并发布 33 张 tracer-bullet 本地实施票。ticket01 已建立首个可运行切片；真实 Linux／模型验收仍待获准配置。
+
+- [ticket01 启动、API 合约与验证账本](docs/implementation/ticket01.md)：首次 `npm ci` → `npm run setup:local` → `npm run build` → `npm start`，访问 `http://127.0.0.1:4310`。默认明确使用确定性实验替身。
 
 - [v0 产品需求文档（PRD）](docs/PRD-v0.md)
 - [33 张实施票、依赖与验收覆盖](.scratch/v0/ticket-plan.md)

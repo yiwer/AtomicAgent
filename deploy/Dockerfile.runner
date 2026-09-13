@@ -1,0 +1,18 @@
+# Supply an approved, digest-pinned node:24.18.0-bookworm-slim image. No implicit latest or unapproved registry pull.
+ARG NODE_IMAGE
+FROM ${NODE_IMAGE} AS build
+WORKDIR /opt/atomicagent
+COPY package.json package-lock.json tsconfig.json ./
+RUN npm ci
+COPY src ./src
+RUN npx tsc
+RUN npm prune --omit=dev
+
+FROM ${NODE_IMAGE}
+WORKDIR /opt/atomicagent
+COPY --from=build /opt/atomicagent/node_modules ./node_modules
+COPY --from=build /opt/atomicagent/dist ./dist
+COPY package.json ./
+RUN mkdir /workspace && chown node:node /workspace
+WORKDIR /workspace
+CMD ["tail", "-f", "/dev/null"]
