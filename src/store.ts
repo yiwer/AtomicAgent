@@ -44,12 +44,17 @@ export class Store {
       }
     });
   }
-  registerDeploymentBinding(id: string, document: string) {
+  registerDeploymentBinding(id: string, document: string, legacyApproval?: string) {
     const existing = this.db.prepare('SELECT document FROM deployment_bindings WHERE id=?').get(id);
     if (existing) { if (existing.document !== document) throw new Error('immutable_deployment_binding_conflict'); return; }
+    const needsConfirmation = this.all().some(run => run.manifest.profile.mode === 'opensandbox' &&
+      `provider:${run.manifest.profile.provider_ref}` === id && (!run.terminal_at || (run.allocation && run.cleanup.status !== 'complete')));
+    if (needsConfirmation && (!legacyApproval || !/^approval-[a-f0-9]{64}$/.test(legacyApproval))) throw new Error('legacy_provider_binding_confirmation_required');
     this.transaction(() => {
       this.db.prepare('INSERT INTO deployment_bindings VALUES(?,?)').run(id, document);
       this.audit('platform', null, 'binding.register', 'fixed-identity');
+      if (needsConfirmation) this.audit('deployment-operator', null, 'binding.legacy-confirm', 'explicit-deployment-declaration', null,
+        { source: 'private-deployment:legacy-provider-binding-confirmation', resource_id: id, operation_id: legacyApproval!, observed_at: now() });
     });
   }
   configurationState(workspace: string): unknown {

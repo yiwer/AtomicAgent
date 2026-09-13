@@ -67,12 +67,14 @@ export function configurationPanel({ api, identity }) {
     $('configuration-timeout-field').hidden = !environment; $('configuration-timeout').required = environment;
     if (environment && binding) { $('configuration-timeout').max = binding.image_limits[$('configuration-value').value]; $('configuration-timeout').value = binding.image_limits[$('configuration-value').value]; }
   }
-  $('configuration-value').onchange = () => {
+  function imageLimit() {
     if ($('configuration-kind').value !== 'environment') return;
     const binding = catalog.bindings.environments.find(b => b.binding_ref === $('configuration-binding').value);
+    if (!binding || !Object.hasOwn(binding.image_limits, $('configuration-value').value)) return;
     const limit = binding.image_limits[$('configuration-value').value]; $('configuration-timeout').max = limit;
     if (Number($('configuration-timeout').value) > limit) $('configuration-timeout').value = limit;
-  };
+  }
+  $('configuration-value').onchange = imageLimit;
   function bindings() {
     const environment = $('configuration-kind').value === 'environment';
     select('configuration-binding', (environment ? catalog.bindings.environments : catalog.bindings.models).map(b => [b.binding_ref,
@@ -88,6 +90,7 @@ export function configurationPanel({ api, identity }) {
       $('configuration-binding').value = revision.content.binding_ref; bindingValues();
       $('configuration-value').value = revision.content.image ?? revision.content.model;
       if (revision.kind === 'environment') $('configuration-timeout').value = revision.content.timeout_seconds;
+      imageLimit();
     }
     $('configuration-form').scrollIntoView({ block: 'nearest' });
   }

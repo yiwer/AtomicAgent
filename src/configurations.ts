@@ -13,6 +13,7 @@ type Definition = Record<string, string | number>;
 interface Revision {
   kind: Kind; name: string; version: string; content: Content; enabled: boolean;
   definition: Definition;
+  content_digest: string;
   published_at: string; published_by: string; reason: string; compatibility: { status: 'unverified'; source: string };
 }
 interface State { generations: Record<string, number>; revisions: Revision[] }
@@ -40,6 +41,9 @@ function describeModel(connection: Connection, content: Content): Definition {
   return { mode: connection.mode, endpoint: connection.endpoint, model: content.model!, binding_ref: content.binding_ref,
     credential_identity: `credential-${contentDigest({ reference: connection.secret_ref, endpoint: connection.endpoint })}`,
     approval_identity: `approval-${contentDigest(connection.approval_ref)}` };
+}
+function revisionContent(kind: Kind, content: Content, definition: Definition) {
+  return { content, definition, content_digest: contentDigest({ kind, content, definition }) };
 }
 
 // The private deployment catalog grants endpoint/credential/image authority. Public commands can only narrow it.
@@ -74,8 +78,8 @@ export class Configurations {
         const environmentContent = { binding_ref: `runtime-${contentDigest(runtimeOf(profile))}`, image: profile.image, timeout_seconds: profile.timeout_seconds };
         const modelContent = { binding_ref: `connection-${contentDigest(connectionOf(profile))}`, model: profile.model };
         state.revisions.push(
-          { ...base, kind: 'environment', content: environmentContent, definition: describeEnvironment(runtimeOf(profile), environmentContent) },
-          { ...base, kind: 'model', content: modelContent, definition: describeModel(connectionOf(profile), modelContent) },
+          { ...base, kind: 'environment', ...revisionContent('environment', environmentContent, describeEnvironment(runtimeOf(profile), environmentContent)) },
+          { ...base, kind: 'model', ...revisionContent('model', modelContent, describeModel(connectionOf(profile), modelContent)) },
         );
       }
       store.transaction(() => { store.saveConfigurationState(workspace, state); store.audit('platform', workspace, 'configuration.migrate', 'fixed-legacy-references'); });
@@ -185,7 +189,7 @@ export class Configurations {
       let revision = preview.previous;
       if (command.action === 'publish') {
         if (preview.state.revisions.length >= 1000) throw new ApiError(409, 'configuration_capacity');
-        revision = { kind: command.kind, name: command.name, version: preview.version, content: command.content!, definition: preview.definition, enabled: true,
+        revision = { kind: command.kind, name: command.name, version: preview.version, ...revisionContent(command.kind, command.content!, preview.definition), enabled: true,
           published_at: now(), published_by: identity.actor, reason: command.reason,
           compatibility: { status: 'unverified', source: 'platform:no-approved-compatibility-evidence' } };
         preview.state.revisions.push(revision);

@@ -56,7 +56,7 @@ npm start
 }
 ```
 
-01–04 的 `profile: "json-lab@1"` 旧请求仍按最初默认固定引用兼容，不能和 environment/model 混用。原 key 回放先于今日配置解析、可用性判断和输入解析，所以停用、目录变更或新的启动默认不会破坏原 key 找回。提交摘要与清单摘要分离；新修订会冻结完整 runtime、model、endpoint、服务端凭据引用、provider 和期限，状态更新拒绝改写已冻结清单。
+01–04 的 `profile: "json-lab@1"` 旧请求仍按最初默认固定引用兼容，不能和 environment/model 混用。原 key 回放先于今日配置解析、可用性判断和输入解析，所以停用、目录变更或新的启动默认不会破坏原 key 找回。提交摘要与清单摘要分离；每个修订有独立 content_digest，覆盖不可变 content 和语义 definition，不包含启用状态。新修订会冻结完整 runtime、model、endpoint、服务端凭据引用、provider 和期限，状态更新拒绝改写已冻结清单。
 
 `GET /v1/configurations/audit` 仅为本工作区配置管理操作历史，固定字段、最多最近 100 条，含读取自身的一次留痕。它不提供普通 Run／平台审计筛选或导出，也不授予 Ticket20 的独立通用审计权限。健康提供登记修订启用数、不可用数、观测时间、来源和覆盖，模型兼容性一直是 unverified。
 
@@ -82,17 +82,28 @@ npm start
 
 迁移保留 registered_profile 不可变校验，从旧 Run 的实际冻结 profile 补建独立历史引用，另登记当前初始 profile。旧 Run 的清单和摘要不重写；清理使用原 provider。已注册组合 id 的原地修改继续拒绝。fixture 与 live 从不静默互换。
 
-04 历史清单保存 provider_ref 与 provider_endpoint，**没有保存 `opensandbox.api_key_ref` 到环境变量的历史映射**。05 起持久固定私有部署给定的映射，不能由此追认 04 未记录的变量名或证明曾用同一凭据。当前迁移实测为 fixture；若接入具有未完成回收责任的旧 live 数据库，运维必须核对原 provider 范围与私有部署依据，缺少依据不能宣称旧凭据映射／资源消失已验收。本轮未读取现有账号凭据弥补历史，也未部署 live。
+04 历史清单保存 provider_ref 与 provider_endpoint，**没有保存 `opensandbox.api_key_ref` 到环境变量的历史映射**。05 不能由当前变量名追认历史账号，也不能让错误账号返回的 404 自动解除旧责任。
+
+当旧 live Run 未终态，或已有 allocation 仍未核验回收，且 provider 还没有持久绑定时，启动在任何恢复 HTTP 调用前拒绝，输出允许名单错误 `legacy_provider_binding_confirmation_required`。运维核对原 provider 范围、账号和私有部署依据后，才可在私有配置提供精确声明：
+
+```json
+{"legacy_provider_binding_confirmations": [{"ref": "原provider身份", "endpoint": "原provider端点", "api_key_ref": "已经核对的原账号变量引用", "approval_ref": "受控迁移证据身份"}]}
+```
+
+三项绑定字段必须精确匹配实际 provider 目录，approval_ref 不得为空；API 无法提交该声明。声明摘要与不可变绑定及所属审计同一事务保存，随后仍以原 Run 的 provider／resource／operation 身份处置。此确认是明确运维声明，并非平台自动验证未保存的历史事实。声明后更换同一 provider 身份的 endpoint／变量引用继续拒绝。
+
+新增确定性迁移回归模拟旧 live 记录与另一个账号的 404，证明未确认时完全没有 DELETE／GET；给出明确测试确认后才允许受控回收观测。它不构成真实账号核验或真实资源回收证据。真实旧 live 库、实际凭据映射和隔离仍未验收；本轮未读取无关凭据、未部署 live。
+
 
 ## 验证账本
 
 | 层次 | 命令／证据 | 结论 |
 | --- | --- | --- |
 | 类型／构建 | `npm run typecheck`、`npm run build` | 通过 |
-| 配置 API 与故障、provider 路由 | `npx tsx --test tests/configurations.test.ts tests/profile-routing.test.ts` | 8／8 通过；公开 API、SQLite 故障、受控执行端、真实 HTTP SDK 回收编解码 |
-| 完整确定性 suite | `npm test` | 53／53 通过；含 04 的真实 30 秒等待和 SSE 边界 |
+| 配置 API 与故障、provider 路由 | `npx tsx --test tests/configurations.test.ts tests/profile-routing.test.ts tests/provider-migration.test.ts` | 9／9 通过；公开 API、SQLite 故障、受控执行端、真实 HTTP SDK 回收编解码 |
+| 完整确定性 suite | `npm test` | 54／54 通过；含 04 的真实 30 秒等待和 SSE 边界 |
 | 编译入口／真实进程重启 | `npx tsx scripts/verify-local.ts`（先 build） | 发布固定修订、普通 Run、停用、重启、命令回放、旧 key、排他锁通过；fixture |
-| A 浏览器 | `npm run test:browser` | 完整报告见本票证据；配置聚焦 3／3 通过 |
+| A 浏览器 | `npm run test:browser` | 13／13 通过；配置聚焦 4／4 |
 | 真实模型／OpenSandbox Docker／Linux 隔离 | 需要准确获准 profile／凭据用途／节点与镜像 | 未执行；浏览器 live-mode 只验证展示，执行端明确拒绝调用 |
 | 人工验收 | 用户明确确认 | 未执行 |
 

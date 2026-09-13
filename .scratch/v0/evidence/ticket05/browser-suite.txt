@@ -3,19 +3,20 @@
 > playwright test
 
 
-Running 12 tests using 1 worker
+Running 13 tests using 1 worker
 
-  ok  1 tests\configurations.spec.ts:3:1 › A previews a configuration change, recovers its lost publication receipt, and submits the selected fixed revisions (3.9s)
-  ok  2 tests\configurations.spec.ts:39:1 › selected revision modes determine the pre-submit warning and incompatible combinations cannot submit (426ms)
-  ok  3 tests\configurations.spec.ts:67:1 › another browser tab rotating the session cannot apply a preview under a different identity (691ms)
-  ok  4 tests\console.spec.ts:2:1 › real browser logs in, submits, refreshes persistent details and recovers from network failure (4.1s)
-  ok  5 tests\console.spec.ts:30:1 › A uploads a real CSV, shows a persistent file Result and downloads after cleanup (3.6s)
-  ok  6 tests\events.spec.ts:3:1 › A resumes the same Run after closing its page and shows the durable Result independently of SSE text (2.6s)
-  ok  7 tests\events.spec.ts:24:1 › A recovers from network loss, deduplicates replay and treats done or EOF only as transport signals (3.8s)
-  ok  8 tests\events.spec.ts:50:1 › A reports an expired cursor and queries the authoritative Run (3.3s)
-  ok  9 tests\idempotency.spec.ts:3:1 › A recovers an accepted submission after response loss and page refresh without creating another task (2.8s)
-  ok 10 tests\idempotency.spec.ts:38:1 › A retains the unresolved request for its server identity across logout without resubmitting it for another identity (964ms)
-  ok 11 tests\idempotency.spec.ts:70:1 › a real authorization denial on recovery preserves the unresolved key until access returns (643ms)
-  ok 12 tests\idempotency.spec.ts:102:1 › another tab changing the shared session cannot submit an unresolved request under that identity (837ms)
+  ok  1 tests\configurations.spec.ts:3:1 › A previews a configuration change, recovers its lost publication receipt, and submits the selected fixed revisions (4.0s)
+  ok  2 tests\configurations.spec.ts:39:1 › selected revision modes determine the pre-submit warning and incompatible combinations cannot submit (441ms)
+  ok  3 tests\configurations.spec.ts:67:1 › another browser tab rotating the session cannot apply a preview under a different identity (708ms)
+  ok  4 tests\configurations.spec.ts:87:1 › editing a non-first approved image restores that image timeout limit and publishes a valid follow-up revision (755ms)
+  ok  5 tests\console.spec.ts:2:1 › real browser logs in, submits, refreshes persistent details and recovers from network failure (4.0s)
+  ok  6 tests\console.spec.ts:30:1 › A uploads a real CSV, shows a persistent file Result and downloads after cleanup (3.7s)
+  ok  7 tests\events.spec.ts:3:1 › A resumes the same Run after closing its page and shows the durable Result independently of SSE text (2.4s)
+  ok  8 tests\events.spec.ts:24:1 › A recovers from network loss, deduplicates replay and treats done or EOF only as transport signals (3.8s)
+  ok  9 tests\events.spec.ts:50:1 › A reports an expired cursor and queries the authoritative Run (3.3s)
+  ok 10 tests\idempotency.spec.ts:3:1 › A recovers an accepted submission after response loss and page refresh without creating another task (2.7s)
+  ok 11 tests\idempotency.spec.ts:38:1 › A retains the unresolved request for its server identity across logout without resubmitting it for another identity (946ms)
+  ok 12 tests\idempotency.spec.ts:70:1 › a real authorization denial on recovery preserves the unresolved key until access returns (654ms)
+  ok 13 tests\idempotency.spec.ts:102:1 › another tab changing the shared session cannot submit an unresolved request under that identity (813ms)
 
-  12 passed (29.8s)
+  13 passed (30.4s)

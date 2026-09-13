@@ -1,0 +1,66 @@
+
+> atomicagent@0.0.1 test
+> tsx --test tests/*.test.ts
+
+✔ maintainer previews and publishes an independent immutable environment revision, then uses it in an ordinary Run (182.5982ms)
+✔ independent model registration actually reaches the execution port; disabling an in-flight revision retains its frozen grant (159.3028ms)
+✔ configuration state, command receipt and audit roll back together on storage failure and recover under the original command identity (84.2779ms)
+✔ configuration commands reject arbitrary secrets, endpoints, mounts, scripts and invented compatibility evidence (106.5601ms)
+✔ a connection change preview names the actual endpoint and credential identity without exposing secret references (68.8376ms)
+✔ pre-05 databases retain old fixed references and cleanup routing while a different default serves new Runs (166.5301ms)
+✔ disable retains old grants and idempotency recovery; conflicts, command replay and authorization survive restart (230.3465ms)
+✔ finite HTTP waiting returns a committed Result and replay changes no execution identity or deadline (136.475ms)
+✔ expired cursors explicitly recover via the authoritative Run, while live sessions stop sending after rotation or expiry (668.9858ms)
+✔ SSE replays durable ordered identities after reconnect and restart without counting delivery as execution (97.3602ms)
+✔ a real 30-second HTTP wait and paused SSE socket release connections without stopping their Run (30680.1245ms)
+✔ wait validation, failed results, event authorization and connection quotas preserve authority (3260.7354ms)
+✔ a pre-events database exposes an explicit current snapshot directly to its authorized caller (88.3603ms)
+✔ running Runs retain events beyond seven days of observation time and a logged-out waiter cannot receive a Result (213.5589ms)
+✔ a slow real HTTP consumer advances through a multi-page recovery backlog and resumes its last consumed cursor (2283.2768ms)
+✔ collection rejects required file symlinks instead of reading outside the task directory (14.54ms)
+✔ oversized input and sparse output files are rejected before content processing (28.5085ms)
+✔ content acceptance handles many rows and categories without quadratic rescanning (208.9995ms)
+✔ uploaded CSV becomes an owned immutable InputObject only after content validation and survives restart (135.4106ms)
+✔ file task executes real code and delivers verified ordered bytes after sandbox cleanup and restart (369.395ms)
+✔ equivalent JSON and changed decimal data are computed from actual input, not fixture answers (531.4466ms)
+✔ transient artifact transfer failures retry only storage and do not repeat Agent execution (217.5994ms)
+✔ JSON number lexemes retain exact decimal precision beyond JavaScript Number (235.3016ms)
+✔ input authorization and safe target rules reject before any execution (174.3872ms)
+✔ tampered input bytes fail preparation without executing or changing the accepted binding (93.6167ms)
+✔ fabricated completion, missing JSON/files and corrupted output content never commit a Result (1381.2745ms)
+✔ links expire independently; source and artifact expiry block new use without rerunning an old key (338.7912ms)
+✔ persistent transfer failure leaves no Result and cleanup debt retains identity until storage recovery (227.1957ms)
+✔ Result, validation and artifact availability roll back together when the commit audit cannot persist (279.6873ms)
+✔ raw file upload validates UTF-8 and enforces the 50 MiB byte limit independently of JSON transport (105.9441ms)
+✔ upload audit preserves the authenticated initiator separately from platform validation (31.8077ms)
+✔ JSON member order does not change the identity of a file submission (343.6494ms)
+✔ same key conflicts for every changed execution field and is isolated by actor and workspace (245.5973ms)
+✔ submission and frozen manifest digests remain distinct across execution and restart, including failed Runs (69.2726ms)
+✔ health reports scoped durable acceptance, replay and conflict observations with freshness (94.5615ms)
+✔ only a confirmed absent key plus a business rejection reports that the submission was not accepted (113.9894ms)
+✔ real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial (161.7997ms)
+✔ an empty provider listing cannot close an unknown create operation (6.2542ms)
+✔ unwritable recovery records do not block disposal of later resources, and observations reconcile after recovery (151.3751ms)
+✔ a failed terminal write cannot prevent cleanup of the same already-started execution on restart (74.4964ms)
+✔ an existing matching profile allows disposal even when a SQLite writer lock prevents transactions (5644.5285ms)
+✔ frozen provider identities route disposal to each actual HTTP provider and reject changed credentials or endpoints (163.7457ms)
+✔ a submitted task survives restart with a validated result and verified cleanup (126.5007ms)
+✔ invalid schema, missing input, and missing authorization fail without an authoritative result (221.8728ms)
+✔ preparation failure cleans its allocated resource without starting an Attempt (52.9467ms)
+✔ cleanup uncertainty does not rewrite committed success and is retried on restart (63.3748ms)
+✔ authentication and server authorization isolate callers and health readers (196.7097ms)
+✔ concurrent duplicate submissions bind one Run, and changed content conflicts (108.7276ms)
+✔ the registered runner cannot silently be replaced by a different execution mode (1.1273ms)
+✔ a nonresponsive preparation cannot outlive the platform deadline or lose its cleanup obligation (1269.0491ms)
+✔ a registered profile revision cannot be changed in place across restart (25.8369ms)
+✔ a live registration cannot switch to a fixture or another provider before recovery (28.0654ms)
+✔ real TCP response loss and abrupt controller process death recover one Run and one controlled start (734.4163ms)
+ℹ upstream_acceptance=202; client_response=TCP_reset; concurrent_retries=16; controller_processes=2; Run=1; Attempt=1; controlled_SandboxPort_starts=1; actual_model_starts=unverified
+ℹ tests 53
+ℹ suites 0
+ℹ pass 53
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37844.9478

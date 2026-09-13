@@ -15,6 +15,7 @@ async function main() {
     opensandbox?: { domain: string; api_key_ref: string };
     approved_profiles?: Profile[];
     providers?: { ref: string; endpoint: string; api_key_ref: string }[];
+    legacy_provider_binding_confirmations?: { ref: string; endpoint: string; api_key_ref: string; approval_ref: string }[];
   };
   validateProfile(config.profile);
   const database = resolve(config.database); await mkdir(dirname(database), { recursive: true });
@@ -54,7 +55,11 @@ async function main() {
       });
     }, [...profiles.filter(p => p.mode === 'fixture'), ...providers.map(p => ({ mode: 'opensandbox' as const, provider_ref: p.ref, provider_endpoint: p.endpoint }))]);
     app = await createApp({ database, profile: config.profile, approvedProfiles: config.approved_profiles, identities: config.identities, sandbox,
-      deploymentBindings: providers.map(p => ({ id: `provider:${p.ref}`, document: contentDigest(p) })) });
+      deploymentBindings: providers.map(p => {
+        const confirmation = config.legacy_provider_binding_confirmations?.find(c => c.ref === p.ref && c.endpoint === p.endpoint && c.api_key_ref === p.api_key_ref);
+        if (confirmation && (typeof confirmation.approval_ref !== 'string' || !/^[\w:./-]{1,160}$/.test(confirmation.approval_ref))) throw new Error('invalid_legacy_binding_confirmation');
+        return { id: `provider:${p.ref}`, document: contentDigest(p), ...(confirmation ? { legacyApproval: `approval-${contentDigest(confirmation)}` } : {}) };
+      }) });
     const url = await app.listen(config.port);
     process.stdout.write(`AtomicAgent ${config.profile.mode}: ${url}\n`);
     await new Promise<void>(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve); });
@@ -62,4 +67,7 @@ async function main() {
     await app?.close(); await lock.close(); await unlink(`${database}.lock`);
   }
 }
-main().catch(() => { process.stderr.write('AtomicAgent startup or shutdown failed. Check private configuration, bindings and database lock.\n'); process.exitCode = 1; });
+main().catch(error => {
+  const code = error instanceof Error && ['legacy_provider_binding_confirmation_required', 'immutable_deployment_binding_conflict'].includes(error.message) ? ` (${error.message})` : '';
+  process.stderr.write(`AtomicAgent startup or shutdown failed${code}. Check private configuration, bindings and database lock.\n`); process.exitCode = 1;
+});

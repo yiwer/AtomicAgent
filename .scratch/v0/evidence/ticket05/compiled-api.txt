@@ -1,16 +1,17 @@
-✔ maintainer previews and publishes an independent immutable environment revision, then uses it in an ordinary Run (129.5842ms)
-✔ independent model registration actually reaches the execution port; disabling an in-flight revision retains its frozen grant (101.5319ms)
-✔ configuration state, command receipt and audit roll back together on storage failure and recover under the original command identity (51.2592ms)
-✔ configuration commands reject arbitrary secrets, endpoints, mounts, scripts and invented compatibility evidence (114.1232ms)
-✔ a connection change preview names the actual endpoint and credential identity without exposing secret references (34.4441ms)
-✔ pre-05 databases retain old fixed references and cleanup routing while a different default serves new Runs (121.6335ms)
-✔ disable retains old grants and idempotency recovery; conflicts, command replay and authorization survive restart (218.9311ms)
-✔ frozen provider identities route disposal to each actual HTTP provider and reject changed credentials or endpoints (78.326ms)
-ℹ tests 8
+✔ maintainer previews and publishes an independent immutable environment revision, then uses it in an ordinary Run (127.5401ms)
+✔ independent model registration actually reaches the execution port; disabling an in-flight revision retains its frozen grant (115.8425ms)
+✔ configuration state, command receipt and audit roll back together on storage failure and recover under the original command identity (50.4143ms)
+✔ configuration commands reject arbitrary secrets, endpoints, mounts, scripts and invented compatibility evidence (129.1182ms)
+✔ a connection change preview names the actual endpoint and credential identity without exposing secret references (51.8931ms)
+✔ pre-05 databases retain old fixed references and cleanup routing while a different default serves new Runs (136.927ms)
+✔ disable retains old grants and idempotency recovery; conflicts, command replay and authorization survive restart (217.9514ms)
+✔ frozen provider identities route disposal to each actual HTTP provider and reject changed credentials or endpoints (80.5222ms)
+✔ an old live obligation cannot be closed by another account 404 without explicit legacy provider binding confirmation (169.8195ms)
+ℹ tests 9
 ℹ suites 0
-ℹ pass 8
+ℹ pass 9
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 905.9315
+ℹ duration_ms 967.2937

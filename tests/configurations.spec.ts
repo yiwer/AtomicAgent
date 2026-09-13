@@ -83,3 +83,22 @@ test('another browser tab rotating the session cannot apply a preview under a di
   const catalog = await (await other.request.get('/v1/configurations')).json();
   expect(catalog.environments.some((r: { name: string }) => r.name === 'identity-preview')).toBe(false);
 });
+
+test('editing a non-first approved image restores that image timeout limit and publishes a valid follow-up revision', async ({ page }) => {
+  await page.goto('/'); await page.getByLabel('访问令牌').fill('browser-test-only-credential-00000000000000000000');
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.getByRole('button', { name: '环境与模型', exact: true }).click();
+  await page.getByRole('button', { name: '登记配置', exact: true }).click();
+  await page.getByLabel('配置名称').fill('long-image'); await page.getByLabel('获准镜像').selectOption('fixture:z-long-image');
+  await page.getByLabel('任务总期限（秒）').fill('60'); await page.getByLabel('变更说明').fill('Use approved long image limit');
+  await page.getByRole('button', { name: '预览变更', exact: true }).click(); await page.getByRole('button', { name: '确认发布', exact: true }).click();
+  const revision = page.locator('#configuration-list article').filter({ has: page.getByRole('heading', { name: '环境 · long-image@1', exact: true }) });
+  await revision.getByRole('button', { name: '发布后续修订' }).click();
+  await expect(page.getByLabel('获准镜像')).toHaveValue('fixture:z-long-image');
+  await expect(page.getByLabel('任务总期限（秒）')).toHaveAttribute('max', '60');
+  await page.getByLabel('变更说明').fill('Preserve selected approved image');
+  await page.getByRole('button', { name: '预览变更', exact: true }).click();
+  await expect(page.getByTestId('configuration-preview')).toBeVisible();
+  await page.getByRole('button', { name: '确认发布', exact: true }).click();
+  await expect(page.getByTestId('configuration-result')).toContainText('long-image@2');
+});

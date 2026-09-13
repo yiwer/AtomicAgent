@@ -47,6 +47,8 @@ test('maintainer previews and publishes an independent immutable environment rev
   const receipt = await published.json();
   assert.equal(receipt.revision.version, '2');
   assert.equal(receipt.revision.content.timeout_seconds, 30);
+  assert.match(receipt.revision.content_digest, /^[a-f0-9]{64}$/);
+  assert.notEqual(receipt.revision.content_digest, catalog.environments[0].content_digest);
   const runResponse = await l.request('/v1/runs?wait_seconds=5', { prompt: 'three apples',
     environment: { profile_id: 'json-lab', version: '2' }, model: { profile_id: 'json-lab', version: '1' }, output_contract: 'summary-value@1' }, 'run-1');
   assert.equal(runResponse.status, 200);

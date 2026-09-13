@@ -17,9 +17,17 @@
 ## 执行记录
 
 - [typecheck.txt](typecheck.txt)、[build.txt](build.txt)：类型／构建。
-- [full-suite.txt](full-suite.txt)：53 项完整 suite，0 失败／跳过。
+- [full-suite.txt](full-suite.txt)：54 项完整 suite，0 失败／跳过。
 - [compiled-restart.txt](compiled-restart.txt)：编译 main 真实独立进程重启、固定新修订、停用、原命令回执、原 Run 和排他锁；只使用临时 fixture 库／随机测试令牌，不打印凭据。
 - [browser-suite.txt](browser-suite.txt)：真实 Chromium＋API＋SQLite；测试 fixture 独立库。
 - 截图：configuration-preview.png、configuration-mobile.png、run-fixed-revisions.png、selected-mode.png。selected-mode 的 live 目录仅测试提交前展示，浏览器 harness 的 live 执行明确拒绝，无网络／模型调用。
 
 未执行：获准模型真实调用、实际 OpenSandbox 容器／Docker／Linux 隔离、旧 live 凭据映射核验、人工验收。未读取无关凭据、未部署远程、未改依赖图、未关闭综合 AC。
+
+## 审查修复与复验
+
+- Standards P2：为每份独立修订持久保存 content_digest，覆盖不可变 content+definition、排除 enabled。缺字段断言 RED 后 API 回归 GREEN。
+- Spec P1：旧 live provider 绑定没有历史变量映射时，未确认启动拒绝在全部恢复 HTTP 之前。受控错误账号404回归先复现错误放行，再证明未确认0调用、明确测试声明后允许观测、已登记身份改绑继续拒绝。服务端确认严格绑定 ref／endpoint／api_key_ref，声明摘要与登记审计原子提交；不把声明当历史实测证明。
+- Spec P2：浏览器重现非首镜像期望60秒、实际max30秒，恢复所选镜像后重算上限，实际发布后续修订通过。
+- 初次完整浏览器出现登录响应未完成即由测试直接读取API的竞态；等待页面真实身份就绪并断言200后，串行全套通过。失败记录保留 browser-initial-failure.txt。
+- 最终完整suite54/54项、浏览器13/13项、编译后配置API/路由/迁移9/9项均已通过；以本目录最终命令输出为准，checkpoint日志保留旧53项/12项计数。

@@ -13,7 +13,7 @@ import { contentDigest, manifestDigest, submissionDigest } from './submission.js
 import { Events } from './events.js';
 import { Configurations } from './configurations.js';
 
-interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string }[] }
+interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string; legacyApproval?: string }[] }
 const digest = (value: string) => createHash('sha256').update(value).digest();
 function publicRun(run: Run) {
   return {
@@ -58,7 +58,7 @@ export async function createApp(options: AppOptions) {
   const store = new Store(options.database);
   try {
     for (const profile of [options.profile, ...(options.approvedProfiles ?? [])]) { validateProfile(profile); store.registerProfile(profile); }
-    for (const binding of options.deploymentBindings ?? []) store.registerDeploymentBinding(binding.id, binding.document);
+    for (const binding of options.deploymentBindings ?? []) store.registerDeploymentBinding(binding.id, binding.document, binding.legacyApproval);
   } catch (error) { store.close(); throw error; }
   const files = new Files(store, options.blobs ?? new DiskBlobs(`${options.database}.objects`));
   await files.recover();
