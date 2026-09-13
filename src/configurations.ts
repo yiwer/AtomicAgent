@@ -1,23 +1,24 @@
+import { registeredMcps, mcpSelection, verifyMcp, probeMcp, type McpBinding, type McpEvidence } from './research.js';
 import { registeredSkills, skillSelections, verifySkill, type SkillBinding } from './skills.js';
 import { ApiError, now, type Identity, type Profile, type RevisionRef } from './domain.js';
 import { Store } from './store.js';
 import { contentDigest } from './submission.js';
 import { validateProfile } from './profile.js';
 
-type Kind = 'environment' | 'model' | 'skill';
+type Kind = 'environment' | 'model' | 'skill' | 'mcp';
 type Runtime = Pick<Profile, 'mode' | 'node' | 'sdk' | 'cli' | 'provider_ref' | 'provider_endpoint' | 'linux_node' | 'runtime'>;
 type Connection = Pick<Profile, 'mode' | 'endpoint' | 'secret_ref' | 'approval_ref'>;
 interface EnvironmentBinding { binding_ref: string; runtime: Runtime; images: string[]; image_limits: Record<string, number>; max_timeout_seconds: number }
 interface ModelBinding { binding_ref: string; connection: Connection; models: string[] }
 interface Content { binding_ref: string; image?: string; timeout_seconds?: number; model?: string }
-type Definition = Record<string, string | number>;
+type Definition = Record<string, unknown>;
 interface Revision {
   kind: Kind; name: string; version: string; content: Content; enabled: boolean;
   definition: Definition;
   content_digest: string;
   published_at: string; published_by: string; reason: string; compatibility: { status: 'unverified'; source: string };
 }
-interface State { generations: Record<string, number>; revisions: Revision[] }
+interface State { mcp_probes?: Record<string, McpEvidence>; generations: Record<string, number>; revisions: Revision[] }
 interface Command { action: 'publish' | 'enable' | 'disable'; kind: Kind; name: string; expected_generation: number; content?: Content; version?: string; reason: string }
 const identifier = /^[-a-zA-Z0-9_.]{1,80}$/;
 const versionPattern = /^[1-9][0-9]{0,6}$/;
@@ -88,7 +89,7 @@ export class Configurations {
   }
   private state(workspace: string): State { return this.store.configurationState(workspace) as State; }
   private available(revision: Revision) {
-    return revision.kind === 'skill' ? registeredSkills.some(b => b.binding_ref === revision.content.binding_ref) : revision.kind === 'environment'
+    return revision.kind === 'mcp' ? registeredMcps.some(b => b.binding_ref === revision.content.binding_ref) : revision.kind === 'skill' ? registeredSkills.some(b => b.binding_ref === revision.content.binding_ref) : revision.kind === 'environment'
       ? this.environments.some(b => b.binding_ref === revision.content.binding_ref && b.images.includes(revision.content.image!) && revision.content.timeout_seconds! <= b.image_limits[revision.content.image!]!)
       : this.models.some(b => b.binding_ref === revision.content.binding_ref && b.models.includes(revision.content.model!));
   }
@@ -96,17 +97,17 @@ export class Configurations {
     const revisions = this.state(workspace).revisions;
     return { observed_at: now(), source: 'platform:durable-configuration-revisions', coverage: 'registered-revisions-only',
       enabled: revisions.filter(r => r.enabled).length, unavailable: revisions.filter(r => r.enabled && !this.available(r)).length,
-      model_compatibility: 'unverified' };
+      model_compatibility: 'unverified', mcp: Object.entries(this.state(workspace).mcp_probes ?? {}).map(([revision, e]) => ({ revision, ...e, freshness: e.observed_at && Date.now() - Date.parse(e.observed_at) <= 60000 ? 'fresh' : 'stale', health: e.observed_at && Date.now() - Date.parse(e.observed_at) <= 60000 && e.connected === true && e.callable === true && e.acquired === 2 ? 'available' : 'unknown' })) };
   }
   list(identity: Identity) {
     const state = this.state(identity.workspace);
     const revisions = state.revisions.map(({ definition, ...r }) => ({ ...r, ...(identity.role === 'maintainer' ? { definition } : {}), available: r.enabled && this.available({ ...r, definition }), generation: state.generations[`${r.kind}:${r.name}`],
       mode: r.kind === 'environment' ? this.environments.find(b => b.binding_ref === r.content.binding_ref)?.runtime.mode ?? 'unknown'
         : this.models.find(b => b.binding_ref === r.content.binding_ref)?.connection.mode ?? 'unknown' }));
-    return { environments: revisions.filter(r => r.kind === 'environment'), models: revisions.filter(r => r.kind === 'model'), skills: revisions.filter(r => r.kind === 'skill'),
+    return { mcp_probes: this.state(identity.workspace).mcp_probes ?? {}, environments: revisions.filter(r => r.kind === 'environment'), models: revisions.filter(r => r.kind === 'model'), skills: revisions.filter(r => r.kind === 'skill'), mcps: revisions.filter(r => r.kind === 'mcp'),
       observed_at: now(), source: 'platform:durable-configuration-revisions',
       ...(identity.role === 'maintainer' ? { bindings: {
-        skills: registeredSkills,
+        skills: registeredSkills, mcps: registeredMcps.map(({ sources, ...b }) => ({ ...b, sources: sources.map(({ snapshot, ...source }) => source) })),
         environments: this.environments.map(b => ({ binding_ref: b.binding_ref, mode: b.runtime.mode, node: b.runtime.node, sdk: b.runtime.sdk, cli: b.runtime.cli,
           runtime: b.runtime.runtime, provider_ref: b.runtime.provider_ref, provider_endpoint: b.runtime.provider_endpoint, linux_node: b.runtime.linux_node,
           images: b.images, image_limits: b.image_limits, max_timeout_seconds: b.max_timeout_seconds })),
@@ -118,17 +119,17 @@ export class Configurations {
   private command(value: unknown): Command {
     const input = object(value);
     fields(input, ['action', 'kind', 'name', 'expected_generation', 'content', 'version', 'reason', 'preview_digest']);
-    if (!['publish', 'enable', 'disable'].includes(String(input.action)) || !['environment', 'model', 'skill'].includes(String(input.kind)) ||
+    if (!['publish', 'enable', 'disable'].includes(String(input.action)) || !['environment', 'model', 'skill', 'mcp'].includes(String(input.kind)) ||
         typeof input.name !== 'string' || !identifier.test(input.name) || !Number.isSafeInteger(input.expected_generation) || Number(input.expected_generation) < 0 ||
         typeof input.reason !== 'string' || !input.reason.trim() || input.reason.length > 300 || /[\x00-\x1f]/.test(input.reason)) throw new ApiError(400, 'invalid_configuration');
     const command = { action: input.action, kind: input.kind, name: input.name, expected_generation: input.expected_generation, reason: input.reason } as Command;
     if (command.action === 'publish') {
       if (input.version !== undefined) throw new ApiError(400, 'invalid_configuration');
       const content = object(input.content);
-      fields(content, command.kind === 'skill' ? ['binding_ref'] : command.kind === 'environment' ? ['binding_ref', 'image', 'timeout_seconds'] : ['binding_ref', 'model']);
+      fields(content, ['skill', 'mcp'].includes(command.kind) ? ['binding_ref'] : command.kind === 'environment' ? ['binding_ref', 'image', 'timeout_seconds'] : ['binding_ref', 'model']);
       if (typeof content.binding_ref !== 'string') throw new ApiError(400, 'invalid_configuration');
-      if (command.kind === 'skill') {
-        if (!registeredSkills.some(b => b.binding_ref === content.binding_ref)) throw new ApiError(400, 'binding_not_allowed');
+      if (command.kind === 'skill' || command.kind === 'mcp') {
+        if (!(command.kind === 'mcp' ? registeredMcps : registeredSkills).some(b => b.binding_ref === content.binding_ref)) throw new ApiError(400, 'binding_not_allowed');
         command.content = { binding_ref: content.binding_ref };
       } else if (command.kind === 'environment') {
         const binding = this.environments.find(b => b.binding_ref === content.binding_ref);
@@ -155,7 +156,7 @@ export class Configurations {
     const previous = command.action === 'publish' ? history.at(-1) : history.find(r => r.version === command.version);
     if (command.action !== 'publish' && !previous) throw new ApiError(404, 'configuration_not_found');
     if (command.action === 'enable' && !this.available(previous!)) throw new ApiError(400, 'binding_not_allowed');
-    const definition = command.action !== 'publish' ? previous!.definition : command.kind === 'skill'
+    const definition = command.action !== 'publish' ? previous!.definition : command.kind === 'mcp' ? { ...registeredMcps.find(b => b.binding_ref === command.content!.binding_ref)! } : command.kind === 'skill'
       ? { ...registeredSkills.find(b => b.binding_ref === command.content!.binding_ref)! } : command.kind === 'environment'
       ? describeEnvironment(this.environments.find(b => b.binding_ref === command.content!.binding_ref)!.runtime, command.content!)
       : describeModel(this.models.find(b => b.binding_ref === command.content!.binding_ref)!.connection, command.content!);
@@ -164,11 +165,11 @@ export class Configurations {
         .map(([field, after]) => ({ field, before: previous?.definition[field] ?? null, after }))
       : [{ field: 'enabled', before: previous!.enabled, after: command.action === 'enable' }];
     const runs = this.store.all().filter(r => r.workspace === workspace && (
-      (command.kind === 'skill' ? r.manifest.skills?.some(s => s.id === command.name) : r.manifest[command.kind === 'environment' ? 'environment' : 'model']?.profile_id === command.name) ||
-      (command.kind !== 'skill' && !r.manifest.environment && r.manifest.profile.id.split('@')[0] === command.name)));
+      (command.kind === 'mcp' ? r.manifest.grant.mcp.some(s => s.id === command.name) : command.kind === 'skill' ? r.manifest.skills?.some(s => s.id === command.name) : r.manifest[command.kind === 'environment' ? 'environment' : 'model']?.profile_id === command.name) ||
+      (!['skill', 'mcp'].includes(command.kind) && !r.manifest.environment && r.manifest.profile.id.split('@')[0] === command.name)));
     const impact = { new_runs: 'Only new Runs explicitly selecting this revision; no default or existing grant changes.',
       existing_run_count: runs.length, existing_runs: runs.slice(0, 100).map(r => ({ run_id: r.run_id, status: r.status,
-        revision: command.kind === 'skill' ? r.manifest.skills?.filter(s => s.id === command.name).map(({ id, version }) => ({ id, version })) : r.manifest[command.kind === 'environment' ? 'environment' : 'model'] ?? { profile_id: r.manifest.profile.id.split('@')[0], version: r.manifest.profile.revision } })),
+        revision: command.kind === 'mcp' ? r.manifest.grant.mcp.map(({ id, version }) => ({ id, version })) : command.kind === 'skill' ? r.manifest.skills?.filter(s => s.id === command.name).map(({ id, version }) => ({ id, version })) : r.manifest[command.kind === 'environment' ? 'environment' : 'model'] ?? { profile_id: r.manifest.profile.id.split('@')[0], version: r.manifest.profile.revision } })),
       truncated: runs.length > 100 };
     return { state, key, previous, version: command.action === 'publish' ? String(Math.max(0, ...history.map(r => Number(r.version))) + 1) : command.version!,
       generation, definition, changes, impact, preview_digest: contentDigest({ workspace, command, generation, changes }) };
@@ -208,6 +209,28 @@ export class Configurations {
       this.store.audit(identity.actor, identity.workspace, `configuration.${command.action}`, 'committed', null,
         { source: 'platform:durable-configuration-command', resource_id: `${command.kind}:${command.name}@${preview.version}`, operation_id: key, observed_at: now() });
       return receipt;
+    });
+  }
+  async probe(identity: Identity, value: unknown) {
+    const input = object(value); fields(input, ['id', 'version']);
+    const binding = this.resolveMcp(identity.workspace, [input])[0]!;
+    const operation = `probe-${contentDigest({ actor: identity.actor, binding: binding.content_digest, at: now() })}`;
+    this.store.audit(identity.actor, identity.workspace, 'configuration.mcp-probe-intent', 'authorized', null,
+      { source: 'platform:fixed-mcp-grant', resource_id: `mcp:${binding.id}@${binding.version}`, operation_id: operation, observed_at: now() });
+    const { evidence } = await probeMcp(binding);
+    this.store.transaction(() => {
+      const state = this.state(identity.workspace); state.mcp_probes ??= {}; state.mcp_probes[`${binding.id}@${binding.version}`] = evidence;
+      this.store.saveConfigurationState(identity.workspace, state);
+      this.store.audit(identity.actor, identity.workspace, 'configuration.mcp-probe-observed', evidence.acquired === binding.sources.length ? 'acquired' : 'incomplete', null,
+        { source: evidence.source, resource_id: `mcp:${binding.id}@${binding.version}`, operation_id: operation, observed_at: evidence.observed_at! });
+    });
+    return { evidence, source_count: binding.sources.length, coverage: 'MCP initialization, tool directory and actual registered reads; model not probed' };
+  }
+  resolveMcp(workspace: string, value: unknown): McpBinding[] {
+    return mcpSelection(value).map(selection => {
+      const r = this.state(workspace).revisions.find(r => r.kind === 'mcp' && r.name === selection.id && r.version === selection.version);
+      if (!r?.enabled || !this.available(r)) throw new ApiError(400, 'config_unavailable');
+      const binding = { ...r.definition, ...selection } as unknown as McpBinding; verifyMcp(binding); return binding;
     });
   }
   resolveSkills(workspace: string, value: unknown): SkillBinding[] {

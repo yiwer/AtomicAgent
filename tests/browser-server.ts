@@ -8,7 +8,7 @@ import { RoutedSandbox } from '../src/profile-routing.js';
 const directory = await mkdtemp(join(tmpdir(), 'atomicagent-browser-'));
 const sandbox = new FixtureSandbox();
 const execute = sandbox.execute.bind(sandbox);
-sandbox.execute = async (run, signal, observeSkills) => { await new Promise(resolve => setTimeout(resolve, 2000)); return execute(run, signal, observeSkills); };
+sandbox.execute = async (run, signal, observeSkills, observeMcp) => { await new Promise(resolve => setTimeout(resolve, 2000)); return execute(run, signal, observeSkills, observeMcp); };
 // A catalog-only live-mode fixture verifies the pre-submit warning. Its adapter fails closed: no network/model execution.
 const livePreview = { ...fixtureProfile, id: 'browser-live-preview@1', mode: 'opensandbox' as const,
   image: `test/runner@sha256:${'1'.repeat(64)}`, model: 'preview-only-model', endpoint: 'https://model.example.com',

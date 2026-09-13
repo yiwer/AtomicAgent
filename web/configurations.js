@@ -44,14 +44,22 @@ export function configurationPanel({ api, identity }) {
       const previousSkills = [...$('skill-revisions').selectedOptions].map(o => o.value);
       select('skill-revisions', data.skills.filter(r => r.available).map(r => [`${r.name}@${r.version}`, `${r.name}@${r.version}`]));
       for (const o of $('skill-revisions').options) o.selected = previousSkills.includes(o.value);
+      select('mcp-revision', [['', '不选择'], ...data.mcps.filter(r => r.available).map(r => [`${r.name}@${r.version}`, `${r.name}@${r.version}`])], $('mcp-revision').value);
       selectionMode();
       $('configuration-list').replaceChildren();
-      for (const revision of [...data.environments, ...data.models, ...data.skills]) {
+      for (const revision of [...data.environments, ...data.models, ...data.skills, ...data.mcps]) {
         const row = node('article', '');
-        row.append(node('h3', `${revision.kind === 'skill' ? 'Skill' : revision.kind === 'environment' ? '环境' : '模型'} · ${revision.name}@${revision.version}`));
+        row.append(node('h3', `${revision.kind === 'mcp' ? 'MCP' : revision.kind === 'skill' ? 'Skill' : revision.kind === 'environment' ? '环境' : '模型'} · ${revision.name}@${revision.version}`));
         row.append(node('p', `${revision.enabled ? '已启用' : '已停用'} · ${revision.available ? '可供新任务选择' : '新任务不可选'} · 兼容性未验证`));
         row.append(node('p', `${revision.published_by} · ${revision.published_at} · ${revision.reason}`));
-        row.append(node('pre', JSON.stringify(revision.definition ?? revision.content, null, 2)));
+        row.append(node('pre', JSON.stringify(revision.definition ?? revision.content, (key, value) => key === 'snapshot' ? '[固定材料正文省略，修订摘要已固定]' : value, 2)));
+        if (revision.kind === 'mcp') {
+          const observation = data.mcp_probes[`${revision.name}@${revision.version}`];
+          row.append(node('p', observation ? `连接 ${observation.connected} · 工具目录 ${observation.callable} · GET 授权 ${observation.authorized ?? '未知'} · 已取来源 ${observation.acquired} · ${observation.observed_at} · ${Date.now()-Date.parse(observation.observed_at)>60000 ? '已过期，健康未知' : '新鲜观测'} · ${observation.source}` : '尚未探测：连接、工具和实际授权均未知'));
+          const probe = node('button', '探测只读 MCP'); probe.disabled = !revision.available;
+          probe.onclick = async () => { const me = active(); probe.disabled = true; try { await api('/v1/configurations/mcp-probe', { method: 'POST', headers: headers(me), body: JSON.stringify({ id: revision.name, version: revision.version }) }); await refresh(); } catch (error) { fail(error); probe.disabled = false; } };
+          row.append(probe);
+        }
         const edit = node('button', '发布后续修订'); edit.disabled = !!pending;
         edit.onclick = () => editRevision(revision);
         const toggle = node('button', revision.enabled ? '停用修订' : '启用修订'); toggle.disabled = !!pending;
@@ -64,7 +72,8 @@ export function configurationPanel({ api, identity }) {
   }
   function bindingValues() {
     const environment = $('configuration-kind').value === 'environment';
-    const skill = $('configuration-kind').value === 'skill';
+    const skill = ['skill','mcp'].includes($('configuration-kind').value);
+    const mcp = $('configuration-kind').value === 'mcp';
     $('configuration-value').hidden = skill; $('configuration-value').required = !skill; $('configuration-value-label').hidden = skill;
     const binding = (environment ? catalog.bindings.environments : catalog.bindings.models).find(b => b.binding_ref === $('configuration-binding').value);
     select('configuration-value', (environment ? binding?.images : binding?.models)?.map(v => [v, v]) ?? []);
@@ -82,9 +91,10 @@ export function configurationPanel({ api, identity }) {
   $('configuration-value').onchange = imageLimit;
   function bindings() {
     const environment = $('configuration-kind').value === 'environment';
-    const skill = $('configuration-kind').value === 'skill';
-    select('configuration-binding', (skill ? catalog.bindings.skills : environment ? catalog.bindings.environments : catalog.bindings.models).map(b => [b.binding_ref,
-      skill ? `${b.entry} · ${b.content_digest.slice(0, 12)}` : environment ? `${b.mode} · Claude SDK ${b.sdk} · ${b.binding_ref.slice(-8)}` : `${b.mode} · ${b.endpoint} · ${b.binding_ref.slice(-8)}`]));
+    const skill = ['skill','mcp'].includes($('configuration-kind').value);
+    const mcp = $('configuration-kind').value === 'mcp';
+    select('configuration-binding', (mcp ? catalog.bindings.mcps : skill ? catalog.bindings.skills : environment ? catalog.bindings.environments : catalog.bindings.models).map(b => [b.binding_ref,
+      mcp ? `${b.server}@${b.server_version} · ${b.mode}` : skill ? `${b.entry} · ${b.content_digest.slice(0, 12)}` : environment ? `${b.mode} · Claude SDK ${b.sdk} · ${b.binding_ref.slice(-8)}` : `${b.mode} · ${b.endpoint} · ${b.binding_ref.slice(-8)}`]));
     bindingValues();
   }
   function editRevision(revision) {
@@ -137,6 +147,7 @@ export function configurationPanel({ api, identity }) {
   $('open-configurations').onclick = async () => {
     try { setPending(); await refresh(); await audit(); if (!$('configurations').open && active()) $('configurations').showModal(); } catch (e) { fail(e); }
   };
+  $('open-mcp').onclick = () => $('open-configurations').click();
   $('open-skills').onclick = () => $('open-configurations').click();
   $('close-configurations').onclick = () => $('configurations').close();
   $('new-configuration').onclick = () => editRevision(null);
@@ -146,7 +157,7 @@ export function configurationPanel({ api, identity }) {
     event.preventDefault();
     const environment = $('configuration-kind').value === 'environment';
     try { await showPreview({ action: 'publish', kind: $('configuration-kind').value, name: $('configuration-name').value, expected_generation: editGeneration,
-      content: { binding_ref: $('configuration-binding').value, ...($('configuration-kind').value === 'skill' ? {} : environment ? { image: $('configuration-value').value, timeout_seconds: Number($('configuration-timeout').value) } : { model: $('configuration-value').value }) },
+      content: { binding_ref: $('configuration-binding').value, ...(['skill','mcp'].includes($('configuration-kind').value) ? {} : environment ? { image: $('configuration-value').value, timeout_seconds: Number($('configuration-timeout').value) } : { model: $('configuration-value').value }) },
       reason: $('configuration-reason').value }); } catch (error) { fail(error); }
   };
   $('commit-configuration').onclick = async () => {
@@ -158,14 +169,14 @@ export function configurationPanel({ api, identity }) {
   };
   $('recover-configuration').onclick = recover;
   return { refresh,
-    connect() { $('open-skills').hidden = active()?.role !== 'maintainer'; $('open-configurations').hidden = active()?.role !== 'maintainer'; setPending(); },
-    logout() { $('open-skills').hidden = true; $('skill-revisions').replaceChildren(); catalog = null; pending = null; preview = null; $('configurations').close(); $('open-configurations').hidden = true;
+    connect() { $('open-mcp').hidden = active()?.role !== 'maintainer'; $('open-skills').hidden = active()?.role !== 'maintainer'; $('open-configurations').hidden = active()?.role !== 'maintainer'; setPending(); },
+    logout() { $('open-mcp').hidden = true; $('mcp-revision').replaceChildren(); $('open-skills').hidden = true; $('skill-revisions').replaceChildren(); catalog = null; pending = null; preview = null; $('configurations').close(); $('open-configurations').hidden = true;
       $('configuration-list').replaceChildren(); $('configuration-audit').textContent = ''; $('configuration-result').textContent = ''; $('configuration-error').hidden = true;
       $('configuration-preview').hidden = true; $('configuration-form').hidden = true; $('environment-revision').replaceChildren(); $('model-revision').replaceChildren(); pendingUI(); },
     selection() {
       const ref = value => { const at = value.lastIndexOf('@'); return { profile_id: value.slice(0, at), version: value.slice(at + 1) }; };
       const skills = [...$('skill-revisions').selectedOptions].map(o => { const r = ref(o.value); return { id: r.profile_id, version: r.version, must_use: $('skills-must-use').checked }; });
-      return { environment: ref($('environment-revision').value), model: ref($('model-revision').value), ...(skills.length ? { skills } : {}) };
+      return { environment: ref($('environment-revision').value), model: ref($('model-revision').value), ...($('mcp-revision').value ? { mcp: [{ id: ref($('mcp-revision').value).profile_id, version: ref($('mcp-revision').value).version }] } : {}), ...(skills.length ? { skills } : {}) };
     },
   };
 }

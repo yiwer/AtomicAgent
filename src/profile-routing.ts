@@ -1,3 +1,4 @@
+import type { ObserveMcp } from './research.js';
 import type { ObserveSkills } from './skills.js';
 import { TaskError, type LoadedInput, type Profile, type Run, type SandboxPort } from './domain.js';
 import { runtimeOf, connectionOf } from './configurations.js';
@@ -26,6 +27,6 @@ export class RoutedSandbox implements SandboxPort {
     if (!adapter.loadInputs) throw new TaskError('provisioning_failed');
     await adapter.loadInputs(run, inputs);
   }
-  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills) { return this.forRun(run).execute(run, signal, observeSkills); }
+  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp) { return this.forRun(run).execute(run, signal, observeSkills, observeMcp); }
   cleanup(run: Run) { return this.forRun(run, 'cleanup').cleanup(run); }
 }

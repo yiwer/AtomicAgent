@@ -1,3 +1,5 @@
+import { runResearch } from './research-execution.js';
+import type { McpBinding } from './research.js';
 import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { mkdir, writeFile, readFile, open } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -6,10 +8,11 @@ import { fileSchema } from './file-contract.js';
 import { collectFiles } from './sandbox-files.js';
 import { requestedSkills, verifySkill, type SkillBinding } from './skills.js';
 
-export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[] }
+export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[] }
 export type QueryPort = (input: Parameters<typeof query>[0]) => AsyncIterable<SDKMessage>;
 // Public engine boundary. The caller supplies an isolated task root; production uses /workspace only.
 export async function runClaude(request: ClaudeRequest, root: string, runQuery: QueryPort = query) {
+  if (request.output_contract === 'research-report@1') return runResearch(request, root, runQuery);
   const selected = request.skills ?? [], evidence = requestedSkills(selected);
   const controller = new AbortController(), remaining = Date.parse(request.deadline_at) - Date.now();
   const fileTask = request.output_contract === 'data-statistics@1';

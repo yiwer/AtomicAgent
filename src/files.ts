@@ -63,7 +63,7 @@ export class Files {
           typeof value.file_id !== 'string' || !safeInputPath(value.path) || paths.has(value.path)) throw new ApiError(400, 'invalid_input_binding');
       paths.add(value.path);
       const object = this.authorized(value.file_id, identity, 'input'); this.available(object);
-      if (!value.path.endsWith('.' + object.format)) throw new ApiError(400, 'input_format_mismatch');
+      if (object.format === 'markdown' || !value.path.endsWith('.' + object.format)) throw new ApiError(400, 'input_format_mismatch');
       return { file_id: object.object_id, path: value.path, sha256: object.sha256, size_bytes: object.size_bytes, format: object.format,
         owner: object.owner, workspace: object.workspace, expires_at: object.expires_at, loaded: false };
     });
@@ -85,7 +85,7 @@ export class Files {
     try {
       for (const file of candidates) {
         const object: StoredObject = { object_id: randomUUID(), kind: 'artifact', owner: run.owner, workspace: run.workspace,
-          run_id: run.run_id, path: file.path, format: file.path.endsWith('.csv') ? 'csv' : 'json',
+          run_id: run.run_id, path: file.path, format: file.path.endsWith('.md') ? 'markdown' : file.path.endsWith('.csv') ? 'csv' : 'json',
           size_bytes: file.bytes.length, sha256: sha256(file.bytes), status: 'staged', expires_at: run.manifest.deadline_at, cleanup_observed_at: null };
         this.store.transaction(() => { this.store.saveObject(object); this.audit(object, 'artifact.transfer-intent', 'staged'); });
         staged.push(object);

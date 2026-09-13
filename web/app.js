@@ -57,7 +57,7 @@ function loggedOut() {
   stopObservation();
   me = null; selected = null; uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
-  $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('skill-evidence').replaceChildren(); $('detail').close();
+  $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('skill-evidence').replaceChildren(); $('mcp-evidence').textContent = ''; $('detail').close();
   renderPending();
 }
 function node(tag, text, className) { const element = document.createElement(tag); element.textContent = text; if (className) element.className = className; return element; }
@@ -74,6 +74,8 @@ async function renderDetail(id, open = false) {
   fact('核验来源', run.cleanup.source); fact('输出校验', run.validation?.status === 'passed' ? `通过 ${run.validation.contract}` : run.validation?.status === 'failed' ? '不合格' : '未完成');
   fact('Attempt', run.attempt_id);
   $('result').textContent = result ? JSON.stringify(result.result, null, 2) : '尚无已提交结果';
+  $('mcp-evidence').textContent = JSON.stringify(run.mcp ?? [], null, 2);
+  if (run.execution.output_contract === 'research-report@1') fact('研究检查范围', '格式与引用检查通过不代表结论正确；结论语义未核验。');
   $('skill-evidence').replaceChildren();
   const state = value => value === null ? '未知' : value ? '是' : '否';
   for (const e of run.skills ?? []) { const row = document.createElement('p'); row.textContent = `${e.id}@${e.version} · 已请求 ${state(e.requested)} · 文件已装载 ${state(e.materialized)} · 引擎已加载 ${state(e.loaded)} · 可调用 ${state(e.callable)} · 实际使用 ${state(e.used)} · ${e.source} · ${JSON.stringify(e.evidence_sources ?? {})} · ${e.observed_at ?? '尚无观测'} · 调用 ${e.invocation_id ?? '无'} · Attempt ${e.attempt_id ?? '尚未开始'}`; $('skill-evidence').append(row); }
@@ -146,7 +148,7 @@ $('submit-form').addEventListener('submit', async event => {
     if (!$('prompt').value.trim()) throw new Error('请填写非空任务提示词。');
     if ($('input-file').files.length && !uploaded) throw new Error('请先上传并校验输入文件。');
     if (!uploaded && configurations.selection().skills?.length) throw new Error('所选 Skill 用于文件处理，请先上传 CSV 或 JSON 输入。');
-    const request = { prompt: $('prompt').value, ...configurations.selection(), output_contract: uploaded ? 'data-statistics@1' : me.output_contract,
+    const request = { prompt: $('prompt').value, ...configurations.selection(), output_contract: configurations.selection().mcp?.length ? 'research-report@1' : uploaded ? 'data-statistics@1' : me.output_contract,
       ...(uploaded ? { inputs: [{ file_id: uploaded.file_id, path: `input/data.${uploaded.format}` }] } : {}) };
     const submission = { key: crypto.randomUUID(), body: JSON.stringify(request) };
     sessionStorage.setItem(pendingStorageKey(me), JSON.stringify(submission));

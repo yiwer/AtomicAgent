@@ -1,3 +1,4 @@
+import { requestedMcp, researchSchema } from './research.js';
 import { requestedSkills } from './skills.js';
 import { createHash, randomUUID, timingSafeEqual, createHmac } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -21,9 +22,9 @@ function publicRun(run: Run) {
     run_id: run.run_id, status: run.status, phase: run.phase, failure: run.failure,
     accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
     submission_digest: submissionDigest(run),
-    cleanup: run.cleanup, validation: run.validation, skills: run.skills ?? [],
+    cleanup: run.cleanup, validation: run.validation, skills: run.skills ?? [], mcp: run.mcp ?? [],
     inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded }) => ({ file_id, path, sha256, size_bytes, loaded })),
-    execution: { skills: (run.manifest.skills ?? []).map(({ id, version, must_use, entry, content_digest }) => ({ id, version, must_use, entry, content_digest })), environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
+    execution: { mcp: run.manifest.grant.mcp.map(({ sources, ...b }) => ({ ...b, sources: sources.map(({ snapshot, ...source }) => source) })), skills: (run.manifest.skills ?? []).map(({ id, version, must_use, entry, content_digest }) => ({ id, version, must_use, entry, content_digest })), environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
       sdk: run.manifest.profile.sdk, cli: run.manifest.profile.cli, node: run.manifest.profile.node,
       image: run.manifest.profile.image, deadline_at: run.manifest.deadline_at, output_contract: run.manifest.output_contract },
   };
@@ -163,7 +164,7 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-06', configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-07', configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven').length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -174,6 +175,12 @@ export async function createApp(options: AppOptions) {
       if (identity.role === 'health') throw new ApiError(403, 'forbidden');
       if (path === '/v1/configurations' && method === 'GET') {
         send(response, 200, configurations.list(identity)); return;
+      }
+      if (path === '/v1/configurations/mcp-probe' && method === 'POST') {
+        if (identity.role !== 'maintainer') throw new ApiError(403, 'forbidden');
+        const actor = request.headers['x-configuration-actor'], workspace = request.headers['x-configuration-workspace'];
+        if ((actor !== undefined || workspace !== undefined) && (actor !== identity.actor || workspace !== identity.workspace)) throw new ApiError(403, 'configuration_identity_changed');
+        send(response, 200, await configurations.probe(identity, await body(request))); return;
       }
       if (path === '/v1/configurations/audit' && method === 'GET') {
         if (identity.role !== 'maintainer') throw new ApiError(403, 'forbidden');
@@ -221,7 +228,7 @@ export async function createApp(options: AppOptions) {
         const input = record(await body(request));
         const key = request.headers['idempotency-key'];
         if (typeof key !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(key)) throw new ApiError(400, 'idempotency_key_required');
-        if (Object.keys(input).some(k => !['prompt', 'profile', 'environment', 'model', 'output_contract', 'inputs', 'skills'].includes(k)) ||
+        if (Object.keys(input).some(k => !['prompt', 'profile', 'environment', 'model', 'output_contract', 'inputs', 'skills', 'mcp'].includes(k)) ||
             typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 8000) throw new ApiError(400, 'invalid_request');
         const requestDigest = contentDigest(input);
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
@@ -230,7 +237,11 @@ export async function createApp(options: AppOptions) {
         // Only this confirmed absent binding can authorize discarding a rejected pending submission.
         submissionNotAccepted = true;
         const resolved = configurations.resolve(identity.workspace, input);
-        if (!['summary-value@1', 'data-statistics@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
+        if (!['summary-value@1', 'data-statistics@1', 'research-report@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
+        const mcp = configurations.resolveMcp(identity.workspace, input.mcp);
+        if ((input.output_contract === 'research-report@1') !== (mcp.length === 1)) throw new ApiError(400, 'mcp_contract_unavailable');
+        if (mcp.length && (input.inputs !== undefined || input.skills !== undefined)) throw new ApiError(400, 'invalid_request');
+        if (mcp.length && resolved.profile.mode === 'fixture' && mcp[0]!.mode !== 'snapshot') throw new ApiError(400, 'mcp_mode_unavailable');
         const skills = configurations.resolveSkills(identity.workspace, input.skills);
         if (skills.length && input.output_contract !== 'data-statistics@1') throw new ApiError(400, 'skill_contract_unavailable');
         const bindings = input.output_contract === 'data-statistics@1' ? files.bind(identity, input.inputs) : [];
@@ -238,10 +249,10 @@ export async function createApp(options: AppOptions) {
         const acceptedAt = now();
         const run: Run = {
           run_id: randomUUID(), owner: identity.actor, workspace: identity.workspace, prompt: input.prompt,
-          request_digest: requestDigest, request_digest_version: 2,
+          request_digest: requestDigest, request_digest_version: 2, ...(mcp.length ? { mcp: mcp.map(requestedMcp) } : {}),
           ...(skills.length ? { skills: requestedSkills(skills) } : {}),
-          manifest: { ...resolved, ...(skills.length ? { skills } : {}), output_contract: input.output_contract as Run['manifest']['output_contract'], schema: bindings.length ? fileSchema : outputSchema,
-            grant: { tools: bindings.length ? ['process-data@1'] : [], mcp: [], inputs: bindings, external_access: 'model-only' },
+          manifest: { ...resolved, ...(skills.length ? { skills } : {}), output_contract: input.output_contract as Run['manifest']['output_contract'], schema: mcp.length ? researchSchema : bindings.length ? fileSchema : outputSchema,
+            grant: { tools: bindings.length ? ['process-data@1'] : [], mcp, inputs: bindings, external_access: mcp.length ? 'registered-readonly' : 'model-only' },
             deadline_at: new Date(Date.now() + resolved.profile.timeout_seconds * 1000).toISOString() },
           status: 'queued', phase: 'queued', failure: null, accepted_at: acceptedAt, terminal_at: null, attempt_id: null,
           allocation: null, cleanup: { status: 'pending', observed_at: null, source: null }, validation: null, result: null,
@@ -280,8 +291,8 @@ export async function createApp(options: AppOptions) {
           const recordTransfer = (outcome: string) => { if (observed) return; observed = true; try { files.audit(object, 'artifact.transfer-observed', outcome, identity!.actor); } catch { /* not proof of receipt */ } };
           response.once('finish', () => recordTransfer('server-response-finished'));
           response.once('close', () => recordTransfer('connection-closed'));
-          response.writeHead(200, { 'Content-Type': object.format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json',
-            'Content-Disposition': `attachment; filename="${object.format === 'csv' ? 'valid.csv' : 'rejected.json'}"`, 'Content-Length': bytes.length });
+          response.writeHead(200, { 'Content-Type': object.format === 'markdown' ? 'text/markdown; charset=utf-8' : object.format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json',
+            'Content-Disposition': `attachment; filename="${object.format === 'markdown' ? 'report.md' : object.format === 'csv' ? 'valid.csv' : 'rejected.json'}"`, 'Content-Length': bytes.length });
           response.end(bytes); return;
         }
       }

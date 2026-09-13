@@ -1,3 +1,4 @@
+import type { McpBinding, McpEvidence, ResearchResult, researchSchema, ObserveMcp } from './research.js';
 import type { SkillBinding, SkillEvidence, ObserveSkills } from './skills.js';
 import type { fileSchema } from './file-contract.js';
 export type Role = 'caller' | 'maintainer' | 'health';
@@ -24,16 +25,16 @@ export class ApiError extends Error {
 export interface Run {
   run_id: string; owner: string; workspace: string; request_digest: string; prompt: string;
   request_digest_version?: 2; manifest_digest?: string;
-  skills?: SkillEvidence[];
-  manifest: { skills?: SkillBinding[]; profile: Profile; environment?: RevisionRef; model?: RevisionRef; output_contract: 'summary-value@1' | 'data-statistics@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema;
-    grant: { tools: string[]; mcp: []; inputs: InputBinding[]; external_access: 'model-only' }; deadline_at: string };
+  skills?: SkillEvidence[]; mcp?: McpEvidence[];
+  manifest: { skills?: SkillBinding[]; profile: Profile; environment?: RevisionRef; model?: RevisionRef; output_contract: 'summary-value@1' | 'data-statistics@1' | 'research-report@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema | typeof researchSchema;
+    grant: { tools: string[]; mcp: McpBinding[]; inputs: InputBinding[]; external_access: 'model-only' | 'registered-readonly' }; deadline_at: string };
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out';
   phase: 'queued' | 'preparing' | 'executing' | 'terminal'; failure: Failure | null;
   accepted_at: string; terminal_at: string | null; attempt_id: string | null;
   allocation: { operation_id: string; resource_id: string | null } | null;
   cleanup: { status: 'pending' | 'complete' | 'unknown' | 'failed'; observed_at: string | null; source: string | null };
-  validation: { status: 'passed' | 'failed'; contract: 'summary-value@1' | 'data-statistics@1'; checks?: string[] } | null;
-  result: { summary: string; value: number } | FileResult | null;
+  validation: { status: 'passed' | 'failed'; contract: 'summary-value@1' | 'data-statistics@1' | 'research-report@1'; checks?: string[] } | null;
+  result: { summary: string; value: number } | FileResult | ResearchResult | null;
   artifacts?: string[];
 }
 export interface RunEvent {
@@ -50,14 +51,14 @@ export interface SandboxPort {
   sourceFor?(run: Run): string;
   prepare(run: Run): Promise<string>;
   loadInputs?(run: Run, inputs: LoadedInput[]): Promise<void>;
-  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills): Promise<unknown>;
+  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown>;
   cleanup(run: Run): Promise<'absent' | 'unknown' | 'present'>;
 }
 export const now = () => new Date().toISOString();
 
 export interface StoredObject {
   object_id: string; kind: 'input' | 'artifact'; owner: string; workspace: string;
-  run_id: string | null; path: string | null; format: 'csv' | 'json';
+  run_id: string | null; path: string | null; format: 'csv' | 'json' | 'markdown';
   size_bytes: number; sha256: string; status: 'staged' | 'available' | 'removed';
   expires_at: string; cleanup_observed_at: string | null;
 }

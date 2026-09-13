@@ -1,3 +1,4 @@
+import { validateResearch, researchMarkdown, type SourceReceipt, type McpEvidence, validateMcpEvidence } from './research.js';
 import { validateSkillEvidence, type ObserveSkills } from './skills.js';
 import { randomUUID } from 'node:crypto';
 import { Ajv } from 'ajv';
@@ -50,7 +51,7 @@ export class Worker {
       run.failure = failure;
       run.status = failure === 'deadline_exceeded' ? 'timed_out' : failure ? 'failed' : 'succeeded';
       run.phase = 'terminal'; run.terminal_at = now();
-      if (!failure || failure === 'output_invalid') run.validation = { status: failure ? 'failed' : 'passed', contract: run.manifest.output_contract, checks: failure ? ['output-contract'] : run.manifest.output_contract === 'data-statistics@1' ? ['schema', 'input-integrity', 'required-files', 'decimal-statistics', 'ordered-rows', 'tool-execution', 'durable-transfer'] : ['schema'] };
+      if (!failure || failure === 'output_invalid') run.validation = { status: failure ? 'failed' : 'passed', contract: run.manifest.output_contract, checks: failure ? ['output-contract'] : run.manifest.output_contract === 'research-report@1' ? ['schema', 'acquired-sources', 'quote-correspondence', 'markdown', 'durable-transfer', 'semantic-review-not-covered'] : run.manifest.output_contract === 'data-statistics@1' ? ['schema', 'input-integrity', 'required-files', 'decimal-statistics', 'ordered-rows', 'tool-execution', 'durable-transfer'] : ['schema'] };
       if (!failure) { this.files.commit(artifacts, run.terminal_at); run.result = result as Run['result']; run.artifacts = artifacts.map(a => a.object_id); }
     });
   }
@@ -95,7 +96,8 @@ export class Worker {
           r.skills = checked;
         }, { outcome: checked.every(e => e.callable) ? 'callable' : 'unknown', evidence: { source: this.sandbox.sourceFor?.(executing) ?? this.sandbox.source, resource_id: executing.allocation!.resource_id, operation_id: executing.attempt_id, observed_at: now() } });
       };
-      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills), controller.signal);
+      const observeMcp = (value: unknown) => { const checked = validateMcpEvidence(executing, value); this.store.change(executing.run_id, 'mcp.observed', r => { if (r.terminal_at || r.attempt_id !== executing.attempt_id) throw new TaskError('execution_lost'); r.mcp = checked; }); };
+      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp), controller.signal);
       const skillEvidence = this.store.get(executing.run_id)!.skills ?? [];
       for (const s of executing.manifest.skills ?? []) {
         const e = skillEvidence.find(e => e.id === s.id && e.version === s.version);
@@ -104,7 +106,21 @@ export class Worker {
       }
       if (controller.signal.aborted || Date.now() >= Date.parse(queued.manifest.deadline_at)) throw new TaskError('deadline_exceeded');
       let candidate = result;
-      if (executing.manifest.output_contract === 'data-statistics@1') {
+      if (executing.manifest.output_contract === 'research-report@1') {
+        const envelope = result as { candidate: unknown; receipts: SourceReceipt[]; mcp: McpEvidence[]; files: { path: string; bytes: Buffer }[] };
+        const binding = executing.manifest.grant.mcp[0]!;
+        const research = validateResearch(envelope.candidate, envelope.receipts, binding);
+        if (!Array.isArray(envelope.files) || envelope.files.length !== 1 || envelope.files[0]?.path !== 'output/report.md' || !Buffer.isBuffer(envelope.files[0].bytes) || envelope.files[0].bytes.toString('utf8') !== researchMarkdown(research)) throw new TaskError('output_invalid');
+        const checked = validateMcpEvidence(executing, envelope.mcp);
+        const e = checked[0];
+        if (envelope.receipts.some(s => Date.parse(s.acquired_at) < Date.parse(executing.accepted_at) || Date.parse(s.acquired_at) > Date.now()+1000)) throw new TaskError('output_invalid');
+        if (!e || e.id !== binding.id || e.version !== binding.version || e.connected !== true || e.callable !== true || e.authorized !== true || e.acquired !== envelope.receipts.length) throw new TaskError('required_capability_failed');
+        this.store.change(executing.run_id, 'mcp.observed', r => { r.mcp = checked;
+          for (const receipt of envelope.receipts) this.store.audit('platform', r.workspace, 'mcp.source-acquired', 'acquired', r.run_id, { source: receipt.source, resource_id: `mcp:${binding.id}@${binding.version}/${receipt.id}`, operation_id: receipt.invocation_id, observed_at: receipt.acquired_at });
+        });
+        candidate = research; phase = 'committing';
+        staged = await beforeDeadline(this.files.stage(executing, envelope.files, controller.signal), controller.signal);
+      } else if (executing.manifest.output_contract === 'data-statistics@1') {
         const validated = validateFiles(result, inputs[0]!); candidate = validated.result;
         this.store.audit('platform', executing.workspace, 'tool.process-data-observed', 'completed', executing.run_id,
           { source: this.sandbox.sourceFor?.(executing) ?? this.sandbox.source, resource_id: executing.allocation!.resource_id, operation_id: executing.attempt_id, observed_at: now() });

@@ -1,0 +1,62 @@
+{
+  "layer": "real-local-MCP-protocol-and-public-network",
+  "model": "not-called",
+  "sandbox": "not-created",
+  "binding": {
+    "binding_ref": "mcp-4f26f6329a94ba00683d18bd549c10229d7fd947b0b18a0da5c9cb7981fd0b98",
+    "transport": "sdk",
+    "server": "atomic-readonly",
+    "version": "1.0.0",
+    "secret_ref": null
+  },
+  "evidence": {
+    "id": "network-verification",
+    "version": "1",
+    "content_digest": "4f26f6329a94ba00683d18bd549c10229d7fd947b0b18a0da5c9cb7981fd0b98",
+    "run_id": null,
+    "attempt_id": null,
+    "requested": true,
+    "connected": true,
+    "callable": true,
+    "authorized": true,
+    "acquired": 2,
+    "observed_at": "2026-09-13T23:07:53.595Z",
+    "source": "controlled-mcp:protocol-probe",
+    "usage": {
+      "requests": 2,
+      "bytes": 24070,
+      "tokens": null,
+      "cost": null,
+      "coverage": "controlled-read-source-only"
+    }
+  },
+  "sources": [
+    {
+      "id": "opensandbox",
+      "url": "https://raw.githubusercontent.com/opensandbox-group/OpenSandbox/60bca638497d9c50e948928b8b15fe22328afee3/README.md",
+      "acquired_at": "2026-09-13T23:07:53.261Z",
+      "sha256": "4a2326875bb8f4fc5528731807a57ca3db0be6f7d70eac5ac6f3c513ce5399f0",
+      "coverage": "first-12000-characters",
+      "transport": "sdk",
+      "mode": "network",
+      "invocation_id": "f9413de0-b464-4a48-9548-39552b194fae",
+      "source": "controlled-mcp:read_source",
+      "http_status": 200,
+      "snapshot_match": true
+    },
+    {
+      "id": "sandcastle",
+      "url": "https://raw.githubusercontent.com/mattpocock/sandcastle/e99f832f26dc9d245c019a9ddd19fa5dee792427/README.md",
+      "acquired_at": "2026-09-13T23:07:53.595Z",
+      "sha256": "90c65b8e2c632fdae9029dd153b0b5ce6f817ba4f21718f7e13947f9203913b4",
+      "coverage": "first-12000-characters",
+      "transport": "sdk",
+      "mode": "network",
+      "invocation_id": "6e434cdd-742e-45d7-9e9f-c6fef9751e16",
+      "source": "controlled-mcp:read_source",
+      "http_status": 200,
+      "snapshot_match": true
+    }
+  ],
+  "passed": true
+}

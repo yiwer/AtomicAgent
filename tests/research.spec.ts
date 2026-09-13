@@ -1,0 +1,27 @@
+import { test, expect } from '@playwright/test';
+test('A publishes and probes readonly MCP, recovers refresh, delivers research report and rejects unauthorized management', async ({ page }) => {
+ await page.goto('/'); await page.getByLabel('访问令牌').fill('browser-test-only-credential-00000000000000000000'); await page.getByRole('button', { name: '登录', exact: true }).click();
+ await page.getByRole('button', { name: 'MCP 只读研究', exact: true }).click(); await page.getByRole('button', { name: '登记配置', exact: true }).click();
+ await page.getByLabel('配置类型').selectOption('mcp'); await page.getByLabel('配置名称').fill('browser-research'); await page.getByLabel('变更说明').fill('固定第一方材料');
+ await page.getByRole('button', { name: '预览变更', exact: true }).click(); await expect(page.getByTestId('configuration-preview')).toContainText('atomic-readonly');
+ await page.getByRole('button', { name: '确认发布', exact: true }).click(); await expect(page.getByTestId('configuration-result')).toContainText('browser-research@1');
+ const row = page.locator('#configuration-list article').filter({ hasText: 'MCP · browser-research@1' });
+ await row.getByRole('button', { name: '探测只读 MCP', exact: true }).click(); await expect(row).toContainText('已取来源 2');
+ await page.screenshot({ path: '.scratch/v0/evidence/ticket07/mcp-probe.png', fullPage: true });
+ await page.reload(); await page.getByRole('button', { name: 'MCP 只读研究', exact: true }).click(); await expect(row).toContainText('已取来源 2');
+ await page.getByRole('button', { name: '关闭配置', exact: true }).click(); await page.getByLabel('研究 MCP（选择后交付报告）').selectOption('browser-research@1');
+ await page.getByLabel('任务提示词').fill('比较项目定位，标明可靠性未知。'); await page.getByRole('button', { name: '提交任务', exact: true }).click();
+ await expect(page.locator('#facts')).toContainText('成功', { timeout: 15000 }); await expect(page.locator('#facts')).toContainText('结论语义未核验');
+ await expect(page.locator('#mcp-evidence')).toContainText('"acquired": 2'); await expect(page.locator('#artifacts')).toContainText('report.md');
+ await page.reload(); await expect(page.locator('#mcp-evidence')).toContainText('"acquired": 2');
+ await page.screenshot({ path: '.scratch/v0/evidence/ticket07/research-result.png', fullPage: true });
+ const denied = await page.request.post('/v1/configurations/mcp-probe', { headers: { Authorization: 'Bearer browser-other-test-credential-000000000000000000' }, data: { id: 'browser-research', version: '1' } }); expect(denied.status()).toBe(403);
+ await page.setViewportSize({ width: 390, height: 844 }); expect(await page.locator('#detail').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+ await page.screenshot({ path: '.scratch/v0/evidence/ticket07/research-mobile.png', fullPage: true });
+ await page.locator('#artifacts').scrollIntoViewIfNeeded();
+ const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: '下载 output/report.md', exact: true }).click();
+ const download = await downloadEvent; expect(download.suggestedFilename()).toBe('report.md'); expect(await download.failure()).toBeNull();
+ await page.screenshot({ path: '.scratch/v0/evidence/ticket07/research-mobile-download.png', fullPage: true });
+ await page.locator('#mcp-evidence').scrollIntoViewIfNeeded(); await page.screenshot({ path: '.scratch/v0/evidence/ticket07/research-mobile-mcp.png', fullPage: true });
+ const changed = await page.request.post('/v1/configurations/mcp-probe', { headers: { 'X-Configuration-Actor': 'different-actor', 'X-Configuration-Workspace': 'browser-lab' }, data: { id: 'browser-research', version: '1' } }); expect(changed.status()).toBe(403);
+});

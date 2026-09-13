@@ -1,0 +1,67 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createApp } from '../src/app.js';
+import { FixtureSandbox } from '../src/fixture-sandbox.js';
+import { fixtureProfile } from '../src/profile.js';
+const identity = { token: 'm'.repeat(40), actor: 'operator', workspace: 'lab', role: 'maintainer' as const };
+test('registered MCP research delivers sourced Markdown after cleanup and retains fixed grant on replay', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'atomic-research-'));
+ const sandbox = new FixtureSandbox();
+ const app = await createApp({ database: join(root, 'runs.db'), profile: fixtureProfile, identities: [identity], sandbox });
+ const url = await app.listen(); t.after(async () => { await app.close(); await rm(root, { recursive: true, force: true }); });
+ const request = async (path: string, data?: unknown, key = 'command') => fetch(url + path, { method: data === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${identity.token}`, 'Content-Type': 'application/json', 'Idempotency-Key': key }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
+ const catalog = await (await request('/v1/configurations')).json(); assert.ok(catalog.bindings.mcps?.length);
+ const command = { action: 'publish', kind: 'mcp', name: 'research', expected_generation: 0, content: { binding_ref: catalog.bindings.mcps[0].binding_ref }, reason: 'Fixed first-party material' };
+ const preview = await (await request('/v1/configurations/preview', command)).json();
+ assert.equal((await request('/v1/configurations/commands', { ...command, preview_digest: preview.preview_digest })).status, 200);
+ const task = { prompt: 'Compare project scope and identify unknown reliability.', profile: fixtureProfile.id, output_contract: 'research-report@1', mcp: [{ id: 'research', version: '1' }] };
+ const response = await request('/v1/runs?wait_seconds=5', task, 'run'); assert.equal(response.status, 200);
+ const run = await response.json(); assert.equal(run.status, 'succeeded'); assert.equal(run.result.sources.length, 2);
+ assert.equal(run.artifacts.length, 1); assert.equal(run.artifacts[0].format, 'markdown');
+ const link = await (await request(`/v1/artifacts/${run.artifacts[0].artifact_id}/download-link`, {})).json();
+ const report = await (await request(link.url)).text(); assert.match(report, /Unknown/); assert.match(report, /https:\/\/raw.githubusercontent.com/);
+ assert.equal((await (await request('/v1/runs/' + run.run_id)).json()).cleanup.status, 'complete');
+ assert.equal((await (await request('/v1/runs?wait_seconds=1', task, 'run')).json()).run_id, run.run_id);
+ assert.equal(sandbox.executions.size, 1);
+ const probe = await (await request('/v1/configurations/mcp-probe', { id: 'research', version: '1' })).json();
+ assert.equal(probe.evidence.connected, true); assert.equal(probe.evidence.callable, true); assert.equal(probe.evidence.authorized, true);
+ assert.equal(probe.evidence.usage.tokens, null);
+ const disable = { action: 'disable', kind: 'mcp', name: 'research', version: '1', expected_generation: 1, reason: 'Stop new grants only' };
+ const impact = await (await request('/v1/configurations/preview', disable)).json(); assert.equal(impact.impact.existing_run_count, 1);
+ const body = { ...disable, preview_digest: impact.preview_digest };
+ const responses = await Promise.all([request('/v1/configurations/commands', body, 'disable-a'), request('/v1/configurations/commands', body, 'disable-b')]);
+ assert.deepEqual(responses.map(r => r.status).sort(), [200,409]);
+ assert.equal((await request('/v1/runs', task, 'new-run')).status, 400);
+ assert.equal((await (await request('/v1/runs?wait_seconds=1', task, 'run')).json()).run_id, run.run_id);
+ assert.equal((await (await request('/v1/configurations')).json()).mcp_probes['research@1'].connected, true);
+});
+
+test('MCP candidate envelope cannot forge audit fields or another Attempt; missing acquisition cannot commit', async t => {
+ const root = await mkdtemp(join(tmpdir(), 'atomic-research-negative-'));
+ const sandbox = new FixtureSandbox(), execute = sandbox.execute.bind(sandbox);
+ let scenario = 'polluted';
+ sandbox.execute = async (run, signal, skills, mcp) => {
+  const result = await execute(run, signal, skills, mcp) as any;
+  if (scenario === 'polluted') result.mcp[0].secret = 'SYNTHETIC_SECRET';
+  if (scenario === 'attempt') result.mcp[0].attempt_id = 'another-attempt';
+  if (scenario === 'sources') result.receipts = [];
+  return result;
+ };
+ const app = await createApp({ database: join(root, 'runs.db'), profile: fixtureProfile, identities: [identity, { ...identity, token: 'c'.repeat(40), actor: 'caller', role: 'caller' }], sandbox });
+ const url = await app.listen(); t.after(async () => { await app.close(); await rm(root, { recursive: true, force: true }); });
+ const request = async (path: string, data?: unknown, key = 'key', token = identity.token) => fetch(url + path, { method: data === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Idempotency-Key': key }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
+ const catalog = await (await request('/v1/configurations')).json();
+ const command = { action: 'publish', kind: 'mcp', name: 'research', expected_generation: 0, content: { binding_ref: catalog.bindings.mcps[0].binding_ref }, reason: 'Negative tests' };
+ const preview = await (await request('/v1/configurations/preview', command)).json();
+ await request('/v1/configurations/commands', { ...command, preview_digest: preview.preview_digest });
+ assert.equal((await request('/v1/configurations/mcp-probe', { id: 'research', version: '1' }, 'probe', 'c'.repeat(40))).status, 403);
+ const task = { prompt: 'Research', profile: fixtureProfile.id, output_contract: 'research-report@1', mcp: [{ id: 'research', version: '1' }] };
+ for (scenario of ['polluted', 'attempt', 'sources']) {
+  const r = await request('/v1/runs?wait_seconds=5', task, scenario); const text = await r.text(); assert.ok(!text.includes('SYNTHETIC_SECRET'));
+  const run = JSON.parse(text); assert.equal(run.status, 'failed'); assert.equal((await request('/v1/runs/'+run.run_id+'/result')).status, 409);
+ }
+ assert.equal(sandbox.executions.size, 3);
+});

@@ -5,7 +5,7 @@
     <div class="workspace" id="nav-workspace">尚未登录</div>
     <p class="nav-label">运行管理</p><a href="/" class="nav-item active" aria-current="page">任务运行</a>
     <span class="nav-item muted">运维总览 <small>未接入</small></span><span class="nav-item muted">资源回收 <small>未接入</small></span>
-    <p class="nav-label">能力与配置</p><button id="open-configurations" class="nav-item" hidden>环境与模型</button><button id="open-skills" class="nav-item" hidden>Skills</button><span class="nav-item muted">MCP <small>未接入</small></span>
+    <p class="nav-label">能力与配置</p><button id="open-configurations" class="nav-item" hidden>环境与模型</button><button id="open-skills" class="nav-item" hidden>Skills</button><button id="open-mcp" class="nav-item" hidden>MCP 只读研究</button>
     <p class="nav-label">平台治理</p><span class="nav-item muted">权限与审计 <small>未接入</small></span>
     <footer>独立任务 · 明确交付<br>v0 / ticket01–06</footer>
   </aside>
@@ -21,7 +21,7 @@
         <div class="content-grid"><div class="stack">
           <section id="submission" class="card"><div class="section-head"><h2>新建任务</h2><span class="muted">提示词或文件处理</span></div>
             <p id="pending-submission" class="notice" hidden>上次提交的响应尚未确认。找回会使用原提交内容；确认后可创建新任务。<button id="recover-submission" type="button">找回未确认提交</button></p>
-            <form id="submit-form"><label for="environment-revision">环境修订</label><select id="environment-revision" required></select><label for="model-revision">模型修订</label><select id="model-revision" required></select><label for="skill-revisions">Skill 修订（可多选）</label><select id="skill-revisions" multiple></select><label><input id="skills-must-use" type="checkbox" checked>必须实际使用所选 Skills</label><label for="prompt">任务提示词</label><textarea id="prompt" rows="3" maxlength="8000" required>请仅返回 JSON：summary 为 "three apples"，value 为整数 3。</textarea>
+            <form id="submit-form"><label for="environment-revision">环境修订</label><select id="environment-revision" required></select><label for="model-revision">模型修订</label><select id="model-revision" required></select><label for="skill-revisions">Skill 修订（可多选）</label><select id="skill-revisions" multiple></select><label><input id="skills-must-use" type="checkbox" checked>必须实际使用所选 Skills</label><label for="mcp-revision">研究 MCP（选择后交付报告）</label><select id="mcp-revision"><option value="">不选择</option></select><label for="prompt">任务提示词</label><textarea id="prompt" rows="3" maxlength="8000" required>请仅返回 JSON：summary 为 "three apples"，value 为整数 3。</textarea>
               <label for="input-file">输入 CSV / JSON</label><input id="input-file" type="file" accept=".csv,.json"><button id="upload-input" type="button">上传输入</button><button id="clear-input" type="button">清除输入</button><p id="input-status" class="muted">未绑定文件 · 提交提示词任务</p>
               <div class="form-foot"><small>上传文件后按十进制规则处理，交付有效 CSV、拒绝 JSON 和统计。</small><button class="primary" id="submit" type="submit">提交任务</button></div></form>
           </section>
@@ -37,7 +37,7 @@
     </main>
   </div>
   <dialog id="detail"><div class="detail-head"><div><p class="eyebrow">RUN DETAIL</p><h2>任务详情</h2></div><button id="close-detail" aria-label="关闭详情">关闭</button></div>
-    <p id="detail-id" class="mono"></p><p id="event-status" role="status"></p><p id="event-progress" class="muted"></p><dl id="facts"></dl><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>任务产物</h3><div id="artifacts"></div><p id="artifact-error" role="status"></p><h3>Skill 证据</h3><div id="skill-evidence"></div><h3>固定执行依据</h3><pre id="manifest"></pre>
+    <p id="detail-id" class="mono"></p><p id="event-status" role="status"></p><p id="event-progress" class="muted"></p><dl id="facts"></dl><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>任务产物</h3><div id="artifacts"></div><p id="artifact-error" role="status"></p><h3>MCP 证据</h3><pre id="mcp-evidence"></pre><h3>Skill 证据</h3><div id="skill-evidence"></div><h3>固定执行依据</h3><pre id="manifest"></pre>
   </dialog>
   <dialog id="configurations"><div class="detail-head"><div><p class="eyebrow">CONFIGURATION REVISIONS</p><h2>环境与模型</h2></div><button id="close-configurations">关闭配置</button></div>
     <p class="notice">模型兼容性未取证。发布与停用只影响新接纳，已有 Run 保留固定清单和授权。</p>
@@ -46,7 +46,7 @@
     <button id="new-configuration">登记配置</button><div id="configuration-list"></div>
     <form id="configuration-form" hidden>
       <h3>登记或发布新修订</h3>
-      <label for="configuration-kind">配置类型</label><select id="configuration-kind"><option value="environment">环境 runtime</option><option value="model">模型连接</option><option value="skill">Skill</option></select>
+      <label for="configuration-kind">配置类型</label><select id="configuration-kind"><option value="environment">环境 runtime</option><option value="model">模型连接</option><option value="skill">Skill</option><option value="mcp">只读 MCP</option></select>
       <label for="configuration-name">配置名称</label><input id="configuration-name" pattern="[-a-zA-Z0-9_.]{1,80}" required maxlength="80">
       <label for="configuration-binding">服务端登记身份</label><select id="configuration-binding" required></select>
       <label id="configuration-value-label" for="configuration-value">获准镜像</label><select id="configuration-value" required></select>

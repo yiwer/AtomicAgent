@@ -1,3 +1,4 @@
+import { probeMcp, validateResearch, researchMarkdown, type ObserveMcp } from './research.js';
 import { requestedSkills, verifySkill, type ObserveSkills } from './skills.js';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -26,7 +27,7 @@ export class FixtureSandbox implements SandboxPort {
     for (const input of inputs) await writeFile(join(root, input.binding.path), input.bytes, { flag: 'wx' });
     await writeFile(join(root, 'request.json'), JSON.stringify({ input_path: inputs[0]!.binding.path, format: inputs[0]!.binding.format }));
   }
-  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills): Promise<unknown> {
+  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown> {
     if (this.executions.has(run.run_id)) throw new TaskError('execution_lost');
     this.executions.add(run.run_id);
     if (run.manifest.skills?.length) {
@@ -37,6 +38,19 @@ export class FixtureSandbox implements SandboxPort {
     if (this.scenario === 'input-required') throw new TaskError('input_required');
     if (this.scenario === 'authorization-required') throw new TaskError('authorization_required');
     if (this.scenario === 'invalid') return { summary: 'I succeeded', value: '3', actor: 'admin', secret: 'SYNTHETIC_SECRET' };
+    if (run.manifest.output_contract === 'research-report@1') {
+      const binding = run.manifest.grant.mcp[0]!;
+      const { evidence, receipts } = await probeMcp(binding, signal);
+      evidence.run_id = run.run_id; evidence.attempt_id = run.attempt_id; observeMcp?.([evidence]);
+      if (receipts.length !== binding.sources.length) throw new TaskError('required_capability_failed');
+      const candidate = { summary: 'Fixed-material research demonstration', conclusions: [
+        { kind: 'fact', statement: 'OpenSandbox describes a general-purpose sandbox platform.', citations: [{ source_id: 'opensandbox', quote: 'general-purpose sandbox platform' }] },
+        { kind: 'fact', statement: 'Sandcastle describes a TypeScript library for orchestrating coding agents.', citations: [{ source_id: 'sandcastle', quote: 'A TypeScript library for orchestrating AI coding agents in isolated sandboxes' }] },
+        { kind: 'unknown', statement: 'Production reliability is not established by README excerpts.', citations: [] },
+      ] };
+      const result = validateResearch(candidate, receipts, binding);
+      return { candidate, receipts, mcp: [evidence], files: [{ path: 'output/report.md', bytes: Buffer.from(researchMarkdown(result)) }] };
+    }
     if (run.manifest.output_contract === 'data-statistics@1') {
       const root = this.directories.get(run.run_id)!;
       const script = fileURLToPath(new URL(import.meta.url.endsWith('.ts') ? './process-data.ts' : './process-data.js', import.meta.url));
