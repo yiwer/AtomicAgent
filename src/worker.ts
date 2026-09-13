@@ -1,3 +1,4 @@
+import { validateSkillEvidence, type ObserveSkills } from './skills.js';
 import { randomUUID } from 'node:crypto';
 import { Ajv } from 'ajv';
 import { now, outputSchema, TaskError, type Failure, type Run, type SandboxPort } from './domain.js';
@@ -82,8 +83,25 @@ export class Worker {
       const executing = this.store.change(prepared.run_id, 'attempt.start-intent', r => {
         if (r.attempt_id) throw new TaskError('execution_lost');
         r.attempt_id = randomUUID(); r.phase = 'executing';
+        for (const e of r.skills ?? []) e.attempt_id = r.attempt_id;
       });
-      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal), controller.signal);
+      const observeSkills: ObserveSkills = evidence => {
+        const checked = validateSkillEvidence(executing, evidence);
+        this.store.change(executing.run_id, 'skill.observed', r => {
+          if (r.terminal_at || r.attempt_id !== executing.attempt_id) throw new TaskError('execution_lost');
+          for (const e of checked) if (e.used && !r.skills?.find(old => old.id === e.id)?.used) {
+            this.store.audit('platform', r.workspace, 'skill.used', 'completed', r.run_id, { source: e.source, resource_id: `skill:${e.id}@${e.version}`, operation_id: e.invocation_id, observed_at: e.observed_at! });
+          }
+          r.skills = checked;
+        }, { outcome: checked.every(e => e.callable) ? 'callable' : 'unknown', evidence: { source: this.sandbox.sourceFor?.(executing) ?? this.sandbox.source, resource_id: executing.allocation!.resource_id, operation_id: executing.attempt_id, observed_at: now() } });
+      };
+      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills), controller.signal);
+      const skillEvidence = this.store.get(executing.run_id)!.skills ?? [];
+      for (const s of executing.manifest.skills ?? []) {
+        const e = skillEvidence.find(e => e.id === s.id && e.version === s.version);
+        if (!e?.loaded || !e.callable) throw new TaskError('required_capability_failed');
+        if (s.must_use && !e.used) throw new TaskError('skill_use_unproven');
+      }
       if (controller.signal.aborted || Date.now() >= Date.parse(queued.manifest.deadline_at)) throw new TaskError('deadline_exceeded');
       let candidate = result;
       if (executing.manifest.output_contract === 'data-statistics@1') {

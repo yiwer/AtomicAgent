@@ -41,11 +41,14 @@ export function configurationPanel({ api, identity }) {
       for (const [id, revisions] of [['environment-revision', data.environments], ['model-revision', data.models]]) {
         select(id, revisions.filter(r => r.available).map(r => [`${r.name}@${r.version}`, `${r.name}@${r.version}${id === 'model-revision' ? ' · 兼容性未验证' : ''}`]), $(id).value);
       }
+      const previousSkills = [...$('skill-revisions').selectedOptions].map(o => o.value);
+      select('skill-revisions', data.skills.filter(r => r.available).map(r => [`${r.name}@${r.version}`, `${r.name}@${r.version}`]));
+      for (const o of $('skill-revisions').options) o.selected = previousSkills.includes(o.value);
       selectionMode();
       $('configuration-list').replaceChildren();
-      for (const revision of [...data.environments, ...data.models]) {
+      for (const revision of [...data.environments, ...data.models, ...data.skills]) {
         const row = node('article', '');
-        row.append(node('h3', `${revision.kind === 'environment' ? '环境' : '模型'} · ${revision.name}@${revision.version}`));
+        row.append(node('h3', `${revision.kind === 'skill' ? 'Skill' : revision.kind === 'environment' ? '环境' : '模型'} · ${revision.name}@${revision.version}`));
         row.append(node('p', `${revision.enabled ? '已启用' : '已停用'} · ${revision.available ? '可供新任务选择' : '新任务不可选'} · 兼容性未验证`));
         row.append(node('p', `${revision.published_by} · ${revision.published_at} · ${revision.reason}`));
         row.append(node('pre', JSON.stringify(revision.definition ?? revision.content, null, 2)));
@@ -61,6 +64,8 @@ export function configurationPanel({ api, identity }) {
   }
   function bindingValues() {
     const environment = $('configuration-kind').value === 'environment';
+    const skill = $('configuration-kind').value === 'skill';
+    $('configuration-value').hidden = skill; $('configuration-value').required = !skill; $('configuration-value-label').hidden = skill;
     const binding = (environment ? catalog.bindings.environments : catalog.bindings.models).find(b => b.binding_ref === $('configuration-binding').value);
     select('configuration-value', (environment ? binding?.images : binding?.models)?.map(v => [v, v]) ?? []);
     $('configuration-value-label').textContent = environment ? '获准镜像' : '获准模型';
@@ -77,8 +82,9 @@ export function configurationPanel({ api, identity }) {
   $('configuration-value').onchange = imageLimit;
   function bindings() {
     const environment = $('configuration-kind').value === 'environment';
-    select('configuration-binding', (environment ? catalog.bindings.environments : catalog.bindings.models).map(b => [b.binding_ref,
-      environment ? `${b.mode} · Claude SDK ${b.sdk} · ${b.binding_ref.slice(-8)}` : `${b.mode} · ${b.endpoint} · ${b.binding_ref.slice(-8)}`]));
+    const skill = $('configuration-kind').value === 'skill';
+    select('configuration-binding', (skill ? catalog.bindings.skills : environment ? catalog.bindings.environments : catalog.bindings.models).map(b => [b.binding_ref,
+      skill ? `${b.entry} · ${b.content_digest.slice(0, 12)}` : environment ? `${b.mode} · Claude SDK ${b.sdk} · ${b.binding_ref.slice(-8)}` : `${b.mode} · ${b.endpoint} · ${b.binding_ref.slice(-8)}`]));
     bindingValues();
   }
   function editRevision(revision) {
@@ -131,6 +137,7 @@ export function configurationPanel({ api, identity }) {
   $('open-configurations').onclick = async () => {
     try { setPending(); await refresh(); await audit(); if (!$('configurations').open && active()) $('configurations').showModal(); } catch (e) { fail(e); }
   };
+  $('open-skills').onclick = () => $('open-configurations').click();
   $('close-configurations').onclick = () => $('configurations').close();
   $('new-configuration').onclick = () => editRevision(null);
   $('configuration-kind').onchange = bindings; $('configuration-binding').onchange = bindingValues;
@@ -139,7 +146,7 @@ export function configurationPanel({ api, identity }) {
     event.preventDefault();
     const environment = $('configuration-kind').value === 'environment';
     try { await showPreview({ action: 'publish', kind: $('configuration-kind').value, name: $('configuration-name').value, expected_generation: editGeneration,
-      content: { binding_ref: $('configuration-binding').value, ...(environment ? { image: $('configuration-value').value, timeout_seconds: Number($('configuration-timeout').value) } : { model: $('configuration-value').value }) },
+      content: { binding_ref: $('configuration-binding').value, ...($('configuration-kind').value === 'skill' ? {} : environment ? { image: $('configuration-value').value, timeout_seconds: Number($('configuration-timeout').value) } : { model: $('configuration-value').value }) },
       reason: $('configuration-reason').value }); } catch (error) { fail(error); }
   };
   $('commit-configuration').onclick = async () => {
@@ -151,13 +158,14 @@ export function configurationPanel({ api, identity }) {
   };
   $('recover-configuration').onclick = recover;
   return { refresh,
-    connect() { $('open-configurations').hidden = active()?.role !== 'maintainer'; setPending(); },
-    logout() { catalog = null; pending = null; preview = null; $('configurations').close(); $('open-configurations').hidden = true;
+    connect() { $('open-skills').hidden = active()?.role !== 'maintainer'; $('open-configurations').hidden = active()?.role !== 'maintainer'; setPending(); },
+    logout() { $('open-skills').hidden = true; $('skill-revisions').replaceChildren(); catalog = null; pending = null; preview = null; $('configurations').close(); $('open-configurations').hidden = true;
       $('configuration-list').replaceChildren(); $('configuration-audit').textContent = ''; $('configuration-result').textContent = ''; $('configuration-error').hidden = true;
       $('configuration-preview').hidden = true; $('configuration-form').hidden = true; $('environment-revision').replaceChildren(); $('model-revision').replaceChildren(); pendingUI(); },
     selection() {
       const ref = value => { const at = value.lastIndexOf('@'); return { profile_id: value.slice(0, at), version: value.slice(at + 1) }; };
-      return { environment: ref($('environment-revision').value), model: ref($('model-revision').value) };
+      const skills = [...$('skill-revisions').selectedOptions].map(o => { const r = ref(o.value); return { id: r.profile_id, version: r.version, must_use: $('skills-must-use').checked }; });
+      return { environment: ref($('environment-revision').value), model: ref($('model-revision').value), ...(skills.length ? { skills } : {}) };
     },
   };
 }

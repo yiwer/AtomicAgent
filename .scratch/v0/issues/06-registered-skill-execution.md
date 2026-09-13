@@ -6,6 +6,8 @@
 
 **Status:** ready-for-agent
 
+**Implementation:** implemented; verification/review in progress. Real integration and human acceptance pending.
+
 **范围来源：** PRD + A；2026-09-14 用户接受 v0＋A 拆分后发布。
 
 **验收对应：** AC-03、AC-08、AC-27。
@@ -33,3 +35,5 @@
 ## Comments
 
 - 2026-09-14：根据用户“接受”发布；尚未开始产品实现或验收。
+
+- 2026-09-14：按已批准公开seams以TDD实现固定Skill登记、配置命令恢复、普通文件任务、SDK插件加载／钩子使用证据和A；实际模型／Linux依赖缺失，综合AC仍未验收。交付说明：`docs/implementation/ticket06.md`；证据：`.scratch/v0/evidence/ticket06/`。

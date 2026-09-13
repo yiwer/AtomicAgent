@@ -1,3 +1,4 @@
+import { validateSkillEvidence, type ObserveSkills } from './skills.js';
 import { Sandbox, SandboxManager, SandboxApiException, type ConnectionConfigOptions } from '@alibaba-group/opensandbox';
 import { ARTIFACT_LIMIT, INPUT_LIMIT } from './file-contract.js';
 import { sha256 } from './files.js';
@@ -37,12 +38,13 @@ export class OpenSandboxAdapter implements SandboxPort {
       }
     } finally { await sandbox.close(); }
   }
-  async execute(run: Run, signal: AbortSignal): Promise<unknown> {
+  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills): Promise<unknown> {
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation!.resource_id!, connectionConfig: this.config(run), readyTimeoutSeconds: 10 });
+    let observationImported = false;
     try {
       await sandbox.files.createDirectories([{ path: '/workspace', mode: 0o700, owner: 'node', group: 'node' }]);
       await sandbox.files.writeFiles([{ path: '/workspace/request.json', mode: 0o600, owner: 'node', group: 'node', data: JSON.stringify({
-        prompt: run.prompt, model: run.manifest.profile.model, endpoint: run.manifest.profile.endpoint,
+        run_id: run.run_id, skills: run.manifest.skills, prompt: run.prompt, model: run.manifest.profile.model, endpoint: run.manifest.profile.endpoint,
         deadline_at: run.manifest.deadline_at, attempt_id: run.attempt_id,
         output_contract: run.manifest.output_contract, input_path: run.manifest.grant.inputs[0]?.path,
         format: run.manifest.grant.inputs[0]?.format,
@@ -60,12 +62,13 @@ export class OpenSandboxAdapter implements SandboxPort {
       const limit = run.manifest.output_contract === 'data-statistics@1' ? Math.ceil(ARTIFACT_LIMIT * 4 / 3) + 32_768 : 16_384;
       if (info['/workspace/result.json']?.type !== 'file' || typeof size !== 'number' || size > limit) throw new TaskError('output_invalid');
       const content = await sandbox.files.readFile('/workspace/result.json', { limit: limit + 1 });
-      let envelope: { failure?: unknown; candidate?: unknown; files?: { path: string; base64: string }[]; execution?: unknown };
+      let envelope: { failure?: unknown; candidate?: unknown; files?: { path: string; base64: string }[]; execution?: unknown; skills?: unknown };
       if (Buffer.byteLength(content) > limit) throw new TaskError('output_invalid');
       try { envelope = JSON.parse(content); } catch { throw new TaskError('output_invalid'); }
+      if (run.manifest.skills?.length) { observeSkills?.(validateSkillEvidence(run, envelope.skills)); observationImported = true; }
       if (envelope.failure) {
         const code = envelope.failure;
-        throw new TaskError(code === 'input_required' || code === 'authorization_required' || code === 'output_invalid' || code === 'deadline_exceeded' ? code : 'runtime_failed');
+        throw new TaskError(code === 'input_required' || code === 'authorization_required' || code === 'output_invalid' || code === 'deadline_exceeded' || code === 'required_capability_failed' || code === 'skill_use_unproven' ? code : 'runtime_failed');
       }
       if (run.manifest.output_contract === 'data-statistics@1') {
         if (!Array.isArray(envelope.files) || envelope.files.length !== 2 || envelope.files.some(f => typeof f.base64 !== 'string' || typeof f.path !== 'string')) throw new TaskError('output_invalid');
@@ -73,6 +76,25 @@ export class OpenSandboxAdapter implements SandboxPort {
           files: envelope.files.map(f => ({ path: f.path, bytes: Buffer.from(f.base64, 'base64') })) };
       }
       return envelope.candidate;
+    } catch (error) {
+      if (!observationImported && run.manifest.skills?.length && observeSkills) {
+        // Command failure can leave authoritative hook records even without a result envelope.
+        try {
+          const path = '/workspace/skill-evidence.jsonl';
+          const info = (await sandbox.files.getFileInfo([path]))[path];
+          if (info?.type === 'file' && typeof info.size === 'number' && info.size <= 256_000) {
+            const journal = await sandbox.files.readFile(path, { limit: 256_001 });
+            if (Buffer.byteLength(journal) <= 256_000 && journal.endsWith('\n')) {
+              const rows = journal.trimEnd().split('\n');
+              if (rows.length <= 40) {
+                const last = JSON.parse(rows.at(-1)!);
+                if (last.run_id === run.run_id && last.attempt_id === run.attempt_id) observeSkills(validateSkillEvidence(run, last.skills));
+              }
+            }
+          }
+        } catch { /* Missing, partial or untrusted evidence stays unknown; never turn a failed command into success. */ }
+      }
+      throw error;
     } finally { await sandbox.close(); }
   }
   async cleanup(run: Run): Promise<'absent' | 'unknown' | 'present'> {

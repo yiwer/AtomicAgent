@@ -1,3 +1,4 @@
+import { requestedSkills, verifySkill, type ObserveSkills } from './skills.js';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -25,9 +26,13 @@ export class FixtureSandbox implements SandboxPort {
     for (const input of inputs) await writeFile(join(root, input.binding.path), input.bytes, { flag: 'wx' });
     await writeFile(join(root, 'request.json'), JSON.stringify({ input_path: inputs[0]!.binding.path, format: inputs[0]!.binding.format }));
   }
-  async execute(run: Run, signal: AbortSignal): Promise<unknown> {
+  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills): Promise<unknown> {
     if (this.executions.has(run.run_id)) throw new TaskError('execution_lost');
     this.executions.add(run.run_id);
+    if (run.manifest.skills?.length) {
+      run.manifest.skills.forEach(verifySkill);
+      observeSkills?.(requestedSkills(run.manifest.skills).map(e => ({ ...e, materialized: true, loaded: true, callable: true, used: true, invocation_id: `fixture-${e.id}`, attempt_id: run.attempt_id, source: this.source, observed_at: new Date().toISOString() })));
+    }
     if (this.scenario === 'timeout') await new Promise((_, reject) => signal.addEventListener('abort', () => reject(new TaskError('deadline_exceeded')), { once: true }));
     if (this.scenario === 'input-required') throw new TaskError('input_required');
     if (this.scenario === 'authorization-required') throw new TaskError('authorization_required');

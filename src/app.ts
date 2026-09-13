@@ -1,3 +1,4 @@
+import { requestedSkills } from './skills.js';
 import { createHash, randomUUID, timingSafeEqual, createHmac } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -20,9 +21,9 @@ function publicRun(run: Run) {
     run_id: run.run_id, status: run.status, phase: run.phase, failure: run.failure,
     accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
     submission_digest: submissionDigest(run),
-    cleanup: run.cleanup, validation: run.validation,
+    cleanup: run.cleanup, validation: run.validation, skills: run.skills ?? [],
     inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded }) => ({ file_id, path, sha256, size_bytes, loaded })),
-    execution: { environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
+    execution: { skills: (run.manifest.skills ?? []).map(({ id, version, must_use, entry, content_digest }) => ({ id, version, must_use, entry, content_digest })), environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
       sdk: run.manifest.profile.sdk, cli: run.manifest.profile.cli, node: run.manifest.profile.node,
       image: run.manifest.profile.image, deadline_at: run.manifest.deadline_at, output_contract: run.manifest.output_contract },
   };
@@ -162,7 +163,7 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-05', configurations: configurations.observation(identity.workspace), submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-06', configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -220,7 +221,7 @@ export async function createApp(options: AppOptions) {
         const input = record(await body(request));
         const key = request.headers['idempotency-key'];
         if (typeof key !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(key)) throw new ApiError(400, 'idempotency_key_required');
-        if (Object.keys(input).some(k => !['prompt', 'profile', 'environment', 'model', 'output_contract', 'inputs'].includes(k)) ||
+        if (Object.keys(input).some(k => !['prompt', 'profile', 'environment', 'model', 'output_contract', 'inputs', 'skills'].includes(k)) ||
             typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 8000) throw new ApiError(400, 'invalid_request');
         const requestDigest = contentDigest(input);
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
@@ -230,13 +231,16 @@ export async function createApp(options: AppOptions) {
         submissionNotAccepted = true;
         const resolved = configurations.resolve(identity.workspace, input);
         if (!['summary-value@1', 'data-statistics@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
+        const skills = configurations.resolveSkills(identity.workspace, input.skills);
+        if (skills.length && input.output_contract !== 'data-statistics@1') throw new ApiError(400, 'skill_contract_unavailable');
         const bindings = input.output_contract === 'data-statistics@1' ? files.bind(identity, input.inputs) : [];
         if (input.output_contract === 'summary-value@1' && input.inputs !== undefined) throw new ApiError(400, 'invalid_request');
         const acceptedAt = now();
         const run: Run = {
           run_id: randomUUID(), owner: identity.actor, workspace: identity.workspace, prompt: input.prompt,
           request_digest: requestDigest, request_digest_version: 2,
-          manifest: { ...resolved, output_contract: input.output_contract as Run['manifest']['output_contract'], schema: bindings.length ? fileSchema : outputSchema,
+          ...(skills.length ? { skills: requestedSkills(skills) } : {}),
+          manifest: { ...resolved, ...(skills.length ? { skills } : {}), output_contract: input.output_contract as Run['manifest']['output_contract'], schema: bindings.length ? fileSchema : outputSchema,
             grant: { tools: bindings.length ? ['process-data@1'] : [], mcp: [], inputs: bindings, external_access: 'model-only' },
             deadline_at: new Date(Date.now() + resolved.profile.timeout_seconds * 1000).toISOString() },
           status: 'queued', phase: 'queued', failure: null, accepted_at: acceptedAt, terminal_at: null, attempt_id: null,

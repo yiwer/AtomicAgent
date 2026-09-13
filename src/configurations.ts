@@ -1,9 +1,10 @@
+import { registeredSkills, skillSelections, verifySkill, type SkillBinding } from './skills.js';
 import { ApiError, now, type Identity, type Profile, type RevisionRef } from './domain.js';
 import { Store } from './store.js';
 import { contentDigest } from './submission.js';
 import { validateProfile } from './profile.js';
 
-type Kind = 'environment' | 'model';
+type Kind = 'environment' | 'model' | 'skill';
 type Runtime = Pick<Profile, 'mode' | 'node' | 'sdk' | 'cli' | 'provider_ref' | 'provider_endpoint' | 'linux_node' | 'runtime'>;
 type Connection = Pick<Profile, 'mode' | 'endpoint' | 'secret_ref' | 'approval_ref'>;
 interface EnvironmentBinding { binding_ref: string; runtime: Runtime; images: string[]; image_limits: Record<string, number>; max_timeout_seconds: number }
@@ -87,7 +88,7 @@ export class Configurations {
   }
   private state(workspace: string): State { return this.store.configurationState(workspace) as State; }
   private available(revision: Revision) {
-    return revision.kind === 'environment'
+    return revision.kind === 'skill' ? registeredSkills.some(b => b.binding_ref === revision.content.binding_ref) : revision.kind === 'environment'
       ? this.environments.some(b => b.binding_ref === revision.content.binding_ref && b.images.includes(revision.content.image!) && revision.content.timeout_seconds! <= b.image_limits[revision.content.image!]!)
       : this.models.some(b => b.binding_ref === revision.content.binding_ref && b.models.includes(revision.content.model!));
   }
@@ -102,9 +103,10 @@ export class Configurations {
     const revisions = state.revisions.map(({ definition, ...r }) => ({ ...r, ...(identity.role === 'maintainer' ? { definition } : {}), available: r.enabled && this.available({ ...r, definition }), generation: state.generations[`${r.kind}:${r.name}`],
       mode: r.kind === 'environment' ? this.environments.find(b => b.binding_ref === r.content.binding_ref)?.runtime.mode ?? 'unknown'
         : this.models.find(b => b.binding_ref === r.content.binding_ref)?.connection.mode ?? 'unknown' }));
-    return { environments: revisions.filter(r => r.kind === 'environment'), models: revisions.filter(r => r.kind === 'model'),
+    return { environments: revisions.filter(r => r.kind === 'environment'), models: revisions.filter(r => r.kind === 'model'), skills: revisions.filter(r => r.kind === 'skill'),
       observed_at: now(), source: 'platform:durable-configuration-revisions',
       ...(identity.role === 'maintainer' ? { bindings: {
+        skills: registeredSkills,
         environments: this.environments.map(b => ({ binding_ref: b.binding_ref, mode: b.runtime.mode, node: b.runtime.node, sdk: b.runtime.sdk, cli: b.runtime.cli,
           runtime: b.runtime.runtime, provider_ref: b.runtime.provider_ref, provider_endpoint: b.runtime.provider_endpoint, linux_node: b.runtime.linux_node,
           images: b.images, image_limits: b.image_limits, max_timeout_seconds: b.max_timeout_seconds })),
@@ -116,16 +118,19 @@ export class Configurations {
   private command(value: unknown): Command {
     const input = object(value);
     fields(input, ['action', 'kind', 'name', 'expected_generation', 'content', 'version', 'reason', 'preview_digest']);
-    if (!['publish', 'enable', 'disable'].includes(String(input.action)) || !['environment', 'model'].includes(String(input.kind)) ||
+    if (!['publish', 'enable', 'disable'].includes(String(input.action)) || !['environment', 'model', 'skill'].includes(String(input.kind)) ||
         typeof input.name !== 'string' || !identifier.test(input.name) || !Number.isSafeInteger(input.expected_generation) || Number(input.expected_generation) < 0 ||
         typeof input.reason !== 'string' || !input.reason.trim() || input.reason.length > 300 || /[\x00-\x1f]/.test(input.reason)) throw new ApiError(400, 'invalid_configuration');
     const command = { action: input.action, kind: input.kind, name: input.name, expected_generation: input.expected_generation, reason: input.reason } as Command;
     if (command.action === 'publish') {
       if (input.version !== undefined) throw new ApiError(400, 'invalid_configuration');
       const content = object(input.content);
-      fields(content, command.kind === 'environment' ? ['binding_ref', 'image', 'timeout_seconds'] : ['binding_ref', 'model']);
+      fields(content, command.kind === 'skill' ? ['binding_ref'] : command.kind === 'environment' ? ['binding_ref', 'image', 'timeout_seconds'] : ['binding_ref', 'model']);
       if (typeof content.binding_ref !== 'string') throw new ApiError(400, 'invalid_configuration');
-      if (command.kind === 'environment') {
+      if (command.kind === 'skill') {
+        if (!registeredSkills.some(b => b.binding_ref === content.binding_ref)) throw new ApiError(400, 'binding_not_allowed');
+        command.content = { binding_ref: content.binding_ref };
+      } else if (command.kind === 'environment') {
         const binding = this.environments.find(b => b.binding_ref === content.binding_ref);
         const image = content.image ?? (binding?.images.length === 1 ? binding.images[0] : undefined);
         if (!binding || typeof image !== 'string' || !binding.images.includes(image) || !Number.isInteger(content.timeout_seconds) ||
@@ -150,7 +155,8 @@ export class Configurations {
     const previous = command.action === 'publish' ? history.at(-1) : history.find(r => r.version === command.version);
     if (command.action !== 'publish' && !previous) throw new ApiError(404, 'configuration_not_found');
     if (command.action === 'enable' && !this.available(previous!)) throw new ApiError(400, 'binding_not_allowed');
-    const definition = command.action !== 'publish' ? previous!.definition : command.kind === 'environment'
+    const definition = command.action !== 'publish' ? previous!.definition : command.kind === 'skill'
+      ? { ...registeredSkills.find(b => b.binding_ref === command.content!.binding_ref)! } : command.kind === 'environment'
       ? describeEnvironment(this.environments.find(b => b.binding_ref === command.content!.binding_ref)!.runtime, command.content!)
       : describeModel(this.models.find(b => b.binding_ref === command.content!.binding_ref)!.connection, command.content!);
     const changes = command.action === 'publish'
@@ -158,11 +164,11 @@ export class Configurations {
         .map(([field, after]) => ({ field, before: previous?.definition[field] ?? null, after }))
       : [{ field: 'enabled', before: previous!.enabled, after: command.action === 'enable' }];
     const runs = this.store.all().filter(r => r.workspace === workspace && (
-      r.manifest[command.kind === 'environment' ? 'environment' : 'model']?.profile_id === command.name ||
-      (!r.manifest.environment && r.manifest.profile.id.split('@')[0] === command.name)));
+      (command.kind === 'skill' ? r.manifest.skills?.some(s => s.id === command.name) : r.manifest[command.kind === 'environment' ? 'environment' : 'model']?.profile_id === command.name) ||
+      (command.kind !== 'skill' && !r.manifest.environment && r.manifest.profile.id.split('@')[0] === command.name)));
     const impact = { new_runs: 'Only new Runs explicitly selecting this revision; no default or existing grant changes.',
       existing_run_count: runs.length, existing_runs: runs.slice(0, 100).map(r => ({ run_id: r.run_id, status: r.status,
-        revision: r.manifest[command.kind === 'environment' ? 'environment' : 'model'] ?? { profile_id: r.manifest.profile.id.split('@')[0], version: r.manifest.profile.revision } })),
+        revision: command.kind === 'skill' ? r.manifest.skills?.filter(s => s.id === command.name).map(({ id, version }) => ({ id, version })) : r.manifest[command.kind === 'environment' ? 'environment' : 'model'] ?? { profile_id: r.manifest.profile.id.split('@')[0], version: r.manifest.profile.revision } })),
       truncated: runs.length > 100 };
     return { state, key, previous, version: command.action === 'publish' ? String(Math.max(0, ...history.map(r => Number(r.version))) + 1) : command.version!,
       generation, definition, changes, impact, preview_digest: contentDigest({ workspace, command, generation, changes }) };
@@ -203,6 +209,17 @@ export class Configurations {
         { source: 'platform:durable-configuration-command', resource_id: `${command.kind}:${command.name}@${preview.version}`, operation_id: key, observed_at: now() });
       return receipt;
     });
+  }
+  resolveSkills(workspace: string, value: unknown): SkillBinding[] {
+    const selected = skillSelections(value);
+    const skills = selected.map(s => {
+      const r = this.state(workspace).revisions.find(r => r.kind === 'skill' && r.name === s.id && r.version === s.version);
+      if (!r?.enabled || !this.available(r)) throw new ApiError(400, 'config_unavailable');
+      return { ...s, binding_ref: r.content.binding_ref, entry: String(r.definition.entry), markdown: String(r.definition.markdown), content_digest: String(r.definition.content_digest) };
+    });
+    skills.forEach(verifySkill);
+    if (new Set(skills.map(s => s.entry)).size !== skills.length) throw new ApiError(400, 'duplicate_skill_entry');
+    return skills;
   }
   resolve(workspace: string, input: Record<string, unknown>): { profile: Profile; environment?: RevisionRef; model?: RevisionRef } {
     const legacy = input.profile !== undefined;
