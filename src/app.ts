@@ -34,14 +34,16 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 export async function createApp(options: AppOptions) {
+  options = { ...options, profile: structuredClone(options.profile), identities: structuredClone(options.identities) };
   validateProfile(options.profile);
   if (options.sandbox.source !== (options.profile.mode === 'fixture' ? 'deterministic-fixture' : 'opensandbox')) throw new Error('profile_adapter_mismatch');
   if (options.identities.length === 0 || options.identities.some(i => i.token.length < 32 || !['caller', 'maintainer', 'health'].includes(i.role) ||
       !/^[\w.-]{1,80}$/.test(i.actor) || !/^[\w.-]{1,80}$/.test(i.workspace)) ||
       new Set(options.identities.map(i => i.token)).size !== options.identities.length) throw new Error('invalid_identity_configuration');
   const store = new Store(options.database);
+  try { store.registerProfile(options.profile); } catch (error) { store.close(); throw error; }
   const worker = new Worker(store, options.sandbox);
-  await worker.recover();
+  try { await worker.recover(); } catch (error) { store.close(); throw error; }
   worker.wake();
   const sessions = new Map<string, { identity: Identity; expires: number }>();
   function authenticate(request: IncomingMessage): Identity {

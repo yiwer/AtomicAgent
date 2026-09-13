@@ -1,0 +1,27 @@
+
+> atomicagent@0.0.1 test
+> tsx --test tests/*.test.ts
+
+✔ real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial (108.2585ms)
+✔ an empty provider listing cannot close an unknown create operation (4.418ms)
+✔ unwritable recovery records do not block disposal of later resources, and observations reconcile after recovery (96.1032ms)
+✔ a failed terminal write cannot prevent cleanup of the same already-started execution on restart (53.5149ms)
+✔ an existing matching profile allows disposal even when a SQLite writer lock prevents transactions (5632.7476ms)
+✔ a submitted task survives restart with a validated result and verified cleanup (82.2744ms)
+✔ invalid schema, missing input, and missing authorization fail without an authoritative result (132.5332ms)
+✔ preparation failure cleans its allocated resource without starting an Attempt (26.0967ms)
+✔ cleanup uncertainty does not rewrite committed success and is retried on restart (36.8363ms)
+✔ authentication and server authorization isolate callers and health readers (161.1825ms)
+✔ concurrent duplicate submissions bind one Run, and changed content conflicts (47.155ms)
+✔ the registered runner cannot silently be replaced by a different execution mode (1.4714ms)
+✔ a nonresponsive preparation cannot outlive the platform deadline or lose its cleanup obligation (1246.566ms)
+✔ a registered profile revision cannot be changed in place across restart (19.8985ms)
+✔ a live registration cannot switch to a fixture or another provider before recovery (21.4643ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6026.8263

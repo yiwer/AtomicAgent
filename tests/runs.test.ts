@@ -125,3 +125,28 @@ test('a nonresponsive preparation cannot outlive the platform deadline or lose i
   const run = await (await l.request(`/v1/runs/${run_id}`)).json();
   assert.equal(run.status, 'timed_out'); assert.equal(run.cleanup.status, 'unknown'); assert.equal(run.attempt_id, null);
 });
+
+test('a registered profile revision cannot be changed in place across restart', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'atomicagent-revision-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const options = { database: join(directory, 'runs.db'), profile: fixtureProfile, identities, sandbox: new FixtureSandbox() };
+  const first = await createApp(options); await first.listen(); await first.close();
+  await assert.rejects(async () => {
+    const second = await createApp({ ...options, profile: { ...fixtureProfile, model: 'different-model' } });
+    await second.close();
+  }, /immutable_profile_conflict/);
+});
+
+test('a live registration cannot switch to a fixture or another provider before recovery', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'atomicagent-live-binding-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const profile = { ...fixtureProfile, mode: 'opensandbox' as const, image: `test/runner@sha256:${'1'.repeat(64)}`,
+    model: 'approved-test-model', endpoint: 'https://model.example.com', provider_endpoint: 'https://sandbox.example.com',
+    linux_node: 'linux-test', approval_ref: 'test-contract-only' };
+  const sandbox = new FixtureSandbox(); Object.defineProperty(sandbox, 'source', { value: 'opensandbox' });
+  const options = { database: join(directory, 'runs.db'), profile, identities, sandbox };
+  const first = await createApp(options); await first.listen(); await first.close();
+  await assert.rejects(createApp({ ...options, profile: fixtureProfile, sandbox: new FixtureSandbox() }), /immutable_profile_conflict/);
+  await assert.rejects(createApp({ ...options, profile: { ...profile, provider_endpoint: 'https://other.example.com' } }), /immutable_profile_conflict/);
+  assert.equal(sandbox.executions.size, 0);
+});

@@ -29,10 +29,11 @@ npm start
 ## 已定稿窄契约
 
 - 固定 `json-lab@1`、`summary-value@1`：非空、最多 500 字符的 `summary` 和整数 `value`，不接受多余字段。提示词最多 8000 字符，HTTP JSON 最多 16 KiB。不支持本票之外的文件、Skills、MCP、任意 schema 或配置编辑。
-- SQLite WAL + FULL 同步事务保存 Run／幂等绑定／清单／授权／关键审计。创建意图先于 provider 请求，Attempt 意图先于 SDK 启动；结果和验证报告随权威终态一次提交。进程恢复不会重启已有 Attempt；失联执行明确失败并处置资源。
+- SQLite WAL + FULL 同步事务保存 Run／幂等绑定／清单／授权／关键审计。登记修订持久固定，重启时在任何恢复动作前核对现有清单；模型、fixture／live 模式或 provider 地址变更均拒绝原地覆盖。真实配置应使用独立数据库，不能覆盖 fixture 实验库。创建意图先于 provider 请求，Attempt 意图先于 SDK 启动；结果和验证报告随权威终态一次提交。进程恢复不会重启已有 Attempt；失联执行明确失败并处置资源。
 - 一个本地控制进程、一个执行槽位；期限包含排队、准备、执行和提交。原型中的并发 2 属后续限额／调度票，当前不代表容量验收。启动锁阻止第二个控制进程；非正常退出后的锁必须由维护者确认原进程已停止后移除，再重新启动，禁止在线删锁。
 - 执行侧同时设置 OpenSandbox TTL、command timeout、SDK abort；平台到期不再等待准备／执行回执。未知创建不再次 create，未知启动不再次 execute；保留原操作身份和回收责任。无资源 ID 时可按归属查找处置，但空列表仍保留 unknown；完整创建对账归 ticket14。
 - 已提交 Result 与回收状态独立。只有 provider 对不可变资源 ID 的新鲜 GET 404 才认定消失；DELETE 成功、GET 403、超时、空列表都不替代核验。启动时重试未完成回收，持续处置控制台与重试调度归 ticket17。
+- 已有数据库与 schema 可读但终态／观测写入失败时，恢复仍使用已读取身份逐项尝试清理，随后拒绝启动新工作；记录恢复后补做核验。该窄路径已覆盖 SQLite 写锁，不代表不可读／损坏数据库下的完整灾难恢复；后者需 ticket21 的外部最小处置记录方案。回收审计独立保存业务无关的 outcome、资源／操作身份、来源与观测时间。
 - 公共响应、健康、审计仅从允许字段投影，不输出 prompt、原始模型文本、SDK stderr、外部错误正文、宿主路径、secret 引用及令牌。业务 Result 是获授权的交付出口，不能当成遥测。健康含观测时间与 ticket01 覆盖范围，模型探测仍为 unknown；完整健康／异常消费归 ticket23／24。
 - 错误区分 `provisioning_failed`、`runtime_failed`、`input_required`、`authorization_required`、`output_invalid`、`deadline_exceeded`、`execution_lost`、`artifact_commit_failed`。无人值守无人工等待，也无整项重跑。
 
@@ -56,15 +57,20 @@ runner 固定 Claude Agent SDK **0.3.270** 及该包携带的 CLI、Node **24.18
 
 | 层次 | 命令／证据 | 结论 |
 | --- | --- | --- |
-| API／持久化／故障契约 | `npm run test:run` | 已执行，详情见本轮测试记录 |
-| OpenSandbox SDK 的真实 HTTP 编解码／回收判定 | `npx tsx --test tests/opensandbox.test.ts` | 本地受控 HTTP 服务；不是 Docker 验收 |
-| 类型／构建 | `npm run typecheck`、`npm run build` | 已执行 |
-| 浏览器 | `npx playwright install chromium`、`npm run test:browser` | 真实 Chromium + 真实 API／SQLite + fixture；截图生成于 `test-results/` |
-| 完整测试 | `npm test` | 交付前执行并记录 |
+| API／持久化／故障契约 | `npm run test:run` | 10 项通过 |
+| SQLite 写入故障／写锁 | `npx tsx --test tests/persistence-faults.test.ts` | 3 项通过，仍可读的既有 schema |
+| OpenSandbox SDK 的真实 HTTP 编解码／回收判定 | `npx tsx --test tests/opensandbox.test.ts` | 2 项通过，本地受控 HTTP 服务；不是 Docker 验收 |
+| 类型／构建 | `npm run typecheck`、`npm run build` | 通过 |
+| 浏览器 | `npx playwright install chromium`、`npm run test:browser` | 1 项通过；真实 Chromium + 真实 API／SQLite + fixture |
+| 完整测试 | `npm test` | 15／15 通过，0 跳过 |
+| 构建入口／跨进程重启／排他锁 | `npm run build` 后 `npx tsx scripts/verify-local.ts` | 通过；fixture，隔离临时库，审计子进程已停止 |
+| 生产依赖审计 | `npm audit --omit=dev` | 0 漏洞；不包含开发工具依赖 |
 | Linux／Docker／真实 SDK／模型／网络／内容 | 尚无获准配置 | 未执行，待外部输入 |
 | 人工验收 | 用户确认 | 待确认 |
 
 本票不关闭后续票或父规格。7 天记录保留、文件保留、审计查询导出、完整部署资格等按原计划后续切片交付。
+
+执行输出见 [完整测试记录](../../.scratch/v0/evidence/ticket01/unit-tests.txt)、[浏览器测试记录](../../.scratch/v0/evidence/ticket01/browser-tests.txt)；截图见 [桌面工作区](../../.scratch/v0/evidence/ticket01/workspace.png)、[任务详情](../../.scratch/v0/evidence/ticket01/detail.png)、[手机布局](../../.scratch/v0/evidence/ticket01/mobile.png)。[双轴审查](../../.scratch/v0/evidence/ticket01/review.md) 的已发现问题已修复并复审。
 
 ## SDK 依据
 

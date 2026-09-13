@@ -2,7 +2,7 @@ import { ApiError, type Profile } from './domain.js';
 export const fixtureProfile: Profile = {
   id: 'json-lab@1', revision: '1', mode: 'fixture', image: 'fixture:no-container',
   node: '24.18.0', sdk: '0.3.270', cli: 'bundled-with-sdk-0.3.270', model: 'fixture:no-model',
-  endpoint: 'https://fixture.invalid', secret_ref: 'none', provider_ref: 'none', linux_node: 'not-connected',
+  endpoint: 'https://fixture.invalid', secret_ref: 'none', provider_ref: 'none', provider_endpoint: 'https://fixture.invalid', linux_node: 'not-connected',
   runtime: 'docker', timeout_seconds: 60, approval_ref: 'deterministic-test-only',
 };
 export function validateProfile(profile: Profile): void {
@@ -18,4 +18,7 @@ export function validateProfile(profile: Profile): void {
   const url = new URL(profile.endpoint);
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.hostname.endsWith('.invalid'))
     throw new ApiError(503, 'invalid_profile');
+  const provider = new URL(profile.provider_endpoint);
+  if (provider.username || provider.password || provider.search || provider.hash || provider.hostname.endsWith('.invalid') ||
+      (provider.protocol !== 'https:' && !(provider.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(provider.hostname)))) throw new ApiError(503, 'invalid_profile');
 }

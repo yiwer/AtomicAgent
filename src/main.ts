@@ -25,6 +25,7 @@ async function main() {
     };
     const sandbox = config.profile.mode === 'fixture' ? new FixtureSandbox() : (() => {
       if (!config.opensandbox || process.platform !== 'linux') throw new Error('linux_opensandbox_configuration_required');
+      if (config.opensandbox.domain !== config.profile.provider_endpoint) throw new Error('provider_binding_mismatch');
       const endpoint = new URL(config.opensandbox.domain);
       if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash ||
           (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(endpoint.hostname)))) throw new Error('secure_provider_endpoint_required');

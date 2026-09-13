@@ -18,10 +18,15 @@ export class Worker {
   private stopping = false;
   constructor(private store: Store, private sandbox: SandboxPort) {}
   async recover() {
+    let recordFailure = false;
     for (const run of this.store.all()) {
-      if (run.status === 'running') this.finish(run.run_id, 'execution_lost');
-      if (run.status !== 'queued' && run.cleanup.status !== 'complete') await this.cleanup(run.run_id);
+      try { if (run.status === 'running') this.finish(run.run_id, 'execution_lost'); }
+      catch { recordFailure = true; }
+      // Already-read immutable identities remain usable for disposal when a business or audit write fails.
+      try { if (run.status !== 'queued' && run.cleanup.status !== 'complete') await this.cleanup(run); }
+      catch { recordFailure = true; }
     }
+    if (recordFailure) throw new Error('recovery_record_unavailable');
   }
   wake() {
     if (this.active || this.stopping) return;
@@ -46,9 +51,10 @@ export class Worker {
     });
   }
   private async execute(queued: Run) {
+    let latest = queued;
     let phase: 'preparing' | 'executing' | 'committing' = 'preparing';
     const left = Date.parse(queued.manifest.deadline_at) - Date.now();
-    if (left <= 0) { this.finish(queued.run_id, 'deadline_exceeded'); await this.cleanup(queued.run_id); return; }
+    if (left <= 0) { try { this.finish(queued.run_id, 'deadline_exceeded'); } finally { await this.cleanup(latest); } return; }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), left);
     try {
@@ -57,7 +63,9 @@ export class Worker {
         r.status = 'running'; r.phase = 'preparing';
         r.allocation = { operation_id: randomUUID(), resource_id: null };
       });
+      latest = run;
       const resource = await beforeDeadline(this.sandbox.prepare(run), controller.signal);
+      latest = { ...run, allocation: { ...run.allocation!, resource_id: resource } };
       const prepared = this.store.change(run.run_id, 'sandbox.prepared', r => { r.allocation!.resource_id = resource; });
       if (controller.signal.aborted) throw new TaskError('deadline_exceeded');
       phase = 'executing';
@@ -76,17 +84,19 @@ export class Worker {
       this.finish(queued.run_id, failure);
     } finally {
       clearTimeout(timer);
-      await this.cleanup(queued.run_id);
+      await this.cleanup(latest);
     }
   }
-  private async cleanup(id: string) {
-    const run = this.store.get(id)!;
+  private async cleanup(run: Run) {
     let status: Run['cleanup']['status'] = 'unknown';
     try { status = !run.allocation || await this.sandbox.cleanup(run) === 'absent' ? 'complete' : 'unknown'; }
     catch { status = 'failed'; }
-    this.store.change(id, 'sandbox.cleanup-observed', r => {
-      r.cleanup = { status, observed_at: now(), source: run.allocation ? this.sandbox.source : 'platform:no-create-intent' };
-    });
+    const observedAt = now();
+    const source = run.allocation ? this.sandbox.source : 'platform:no-create-intent';
+    this.store.change(run.run_id, 'sandbox.cleanup-observed', r => {
+      r.cleanup = { status, observed_at: observedAt, source };
+    }, { outcome: status, evidence: { source, observed_at: observedAt,
+      resource_id: run.allocation?.resource_id ?? null, operation_id: run.allocation?.operation_id ?? null } });
   }
   async close() { this.stopping = true; await this.active; }
 }

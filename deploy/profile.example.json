@@ -4,7 +4,7 @@
     "image": "REPLACE_WITH_BUILT_IMAGE@sha256:REPLACE_DIGEST",
     "node": "24.18.0", "sdk": "0.3.270", "cli": "bundled-with-sdk-0.3.270",
     "model": "REPLACE_APPROVED_EXACT_MODEL", "endpoint": "https://REPLACE_APPROVED_ENDPOINT.invalid",
-    "secret_ref": "ATOMIC_MODEL_KEY", "provider_ref": "REPLACE_APPROVED_OPENSANDBOX_DEPLOYMENT_REVISION",
+    "secret_ref": "ATOMIC_MODEL_KEY", "provider_ref": "REPLACE_APPROVED_OPENSANDBOX_DEPLOYMENT_REVISION", "provider_endpoint": "http://127.0.0.1:8080",
     "linux_node": "REPLACE_APPROVED_LINUX_NODE", "runtime": "docker", "timeout_seconds": 60,
     "approval_ref": "REPLACE_PURPOSE_AND_BILLING_APPROVAL_REFERENCE"
   },

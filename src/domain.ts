@@ -3,7 +3,7 @@ export interface Identity { token: string; actor: string; workspace: string; rol
 export interface Profile {
   id: string; mode: 'fixture' | 'opensandbox'; revision: string; image: string;
   node: string; sdk: string; cli: string; model: string; endpoint: string;
-  secret_ref: string; provider_ref: string; linux_node: string; runtime: 'docker';
+  secret_ref: string; provider_ref: string; provider_endpoint: string; linux_node: string; runtime: 'docker';
   timeout_seconds: number; approval_ref: string;
 }
 export const outputSchema = {
