@@ -15,19 +15,21 @@
 
 补充故障回归覆盖输入篡改、目标路径／重复目标／越权／health 权限、缺 JSON／缺文件／伪造完成／统计篡改／CSV 篡改／拒绝清单篡改、链接与源对象过期、持久转存故障与回收责任、SQLite 提交审计回滚、目录符号链接／junction、100 MiB+1 稀疏产物和 30,000 行／类别验收。一次 Windows 测试清理失败是注入连接关闭次序 EBUSY，修复测试连接生命周期后通过，不计为产品成功证据。
 
+审查修复补充 RED／GREEN：上传审计主体实际 platform、预期调用身份 a；修复后同时断言发起方、对象身份与来源通过。修复提交为 `9a8f026`。
+
 ## 最终检查
 
 | 层次 | 命令与原始输出 | 结果 |
 | --- | --- | --- |
 | 类型 | `npm run typecheck`：[输出](typecheck.txt) | 通过 |
 | 编译 | `npm run build`：[输出](build.txt) | 通过 |
-| 完整确定性 suite | `npm test`：[输出](unit-tests.txt) | 30 / 30，0 fail / skip |
-| 实际编译后文件路径 | `node --test dist/tests/files.test.js`：[输出](release-files.txt) | 12 / 12；处理子进程使用编译后的 .js |
+| 完整确定性 suite | `npm test`：[输出](unit-tests.txt) | 31 / 31，0 fail / skip |
+| 实际编译后文件路径 | `node --test dist/tests/files.test.js`：[输出](release-files.txt) | 13 / 13；处理子进程使用编译后的 .js |
 | Chromium | `npm run test:browser`：[输出](browser-tests.txt) | 2 / 2，包含既有登录／错误恢复和文件交付 |
 | 目视检查 | [A 文件详情](file-detail.png) | 结果、独立回收与两个下载按钮可见，无重叠；截图为 fixture，非模型或人工验收 |
-| 双轴审查 | [审查记录](review.md) | 待本票固定 checkpoint 审查与修复完成后补录 |
+| 双轴审查 | [审查记录](review.md) | Standards 1 项 P2 和1项 smell 已修复复核；Spec 0项实质缺陷 |
 
-完整套件包括 ticket01 的 15 项既有行为与本票 15 项文件检查。八行输入来源为 [validation-plan.md](../../../../docs/validation-plan.md)，预期独立固定为有效 7、拒绝 r04 一行、总和 50、alpha 22.5、beta 27.5；另有等价 JSON、0.1＋0.2−0.1 和超 Number 精度输入，未固定返回样例答案。平台验收器与实际处理器使用不同十进制求和实现。
+完整套件包括 ticket01 的 15 项既有行为与本票 16 项文件检查。八行输入来源为 [validation-plan.md](../../../../docs/validation-plan.md)，预期独立固定为有效 7、拒绝 r04 一行、总和 50、alpha 22.5、beta 27.5；另有等价 JSON、0.1＋0.2−0.1 和超 Number 精度输入，未固定返回样例答案。平台验收器与实际处理器使用不同十进制求和实现。
 
 ## 未执行的验收
 
