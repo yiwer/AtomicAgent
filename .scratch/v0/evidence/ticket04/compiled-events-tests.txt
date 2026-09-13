@@ -1,0 +1,15 @@
+✔ finite HTTP waiting returns a committed Result and replay changes no execution identity or deadline (86.1359ms)
+✔ expired cursors explicitly recover via the authoritative Run, while live sessions stop sending after rotation or expiry (610.4209ms)
+✔ SSE replays durable ordered identities after reconnect and restart without counting delivery as execution (73.8217ms)
+✔ a real 30-second HTTP wait and paused SSE socket release connections without stopping their Run (30666.2139ms)
+✔ wait validation, failed results, event authorization and connection quotas preserve authority (3251.4116ms)
+✔ a pre-events database exposes an explicit current snapshot directly to its authorized caller (83.5614ms)
+✔ a slow real HTTP consumer advances through a multi-page recovery backlog and resumes its last consumed cursor (2272.182ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37173.5894

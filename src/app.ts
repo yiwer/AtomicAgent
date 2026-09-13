@@ -10,8 +10,9 @@ import { Files, publicObject, sha256 } from './files.js';
 import { DiskBlobs, type BlobPort } from './blob-store.js';
 import { fileSchema, ARTIFACT_LIMIT, INPUT_LIMIT } from './file-contract.js';
 import { contentDigest, manifestDigest, submissionDigest } from './submission.js';
+import { Events } from './events.js';
 
-interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort }
+interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number }
 const digest = (value: string) => createHash('sha256').update(value).digest();
 function publicRun(run: Run) {
   return {
@@ -55,8 +56,11 @@ export async function createApp(options: AppOptions) {
   const files = new Files(store, options.blobs ?? new DiskBlobs(`${options.database}.objects`));
   await files.recover();
   const worker = new Worker(store, options.sandbox, files);
-  try { await worker.recover(); } catch (error) { store.close(); throw error; }
+  try { await worker.recover(); store.initializeEvents(); } catch (error) { store.close(); throw error; }
   worker.wake();
+  // Observation/session clock is an external test seam; it never sets execution deadlines.
+  const clock = options.clock ?? Date.now;
+  const events = new Events(store, clock);
   const linkSecret = randomUUID() + randomUUID();
   const sessions = new Map<string, { identity: Identity; expires: number }>();
   function authenticate(request: IncomingMessage): Identity {
@@ -67,7 +71,7 @@ export async function createApp(options: AppOptions) {
     } else {
       const session = request.headers.cookie?.match(/(?:^|; )atomic_session=([a-f0-9-]+)(?:;|$)/)?.[1];
       const found = session && sessions.get(session);
-      if (found && found.expires > Date.now()) return found.identity;
+      if (found && found.expires > clock()) return found.identity;
     }
     throw new ApiError(401, 'authentication_required');
   }
@@ -76,6 +80,30 @@ export async function createApp(options: AppOptions) {
   }
   function send(response: ServerResponse, status: number, data: unknown) {
     response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(JSON.stringify(data));
+  }
+  async function replySubmission(request: IncomingMessage, response: ServerResponse, run: Run, waitSeconds: number) {
+    const until = Date.now() + waitSeconds * 1000;
+    let current = run;
+    let disconnected = response.destroyed;
+    let wake: (() => void) | undefined;
+    const onClose = () => { disconnected = true; wake?.(); };
+    response.once('close', onClose);
+    try {
+      while (waitSeconds > 0 && !current.terminal_at && !disconnected && Date.now() < until) {
+        await new Promise<void>(resolve => {
+          const timer = setTimeout(() => { wake = undefined; resolve(); }, Math.min(25, until - Date.now()));
+          wake = () => { clearTimeout(timer); wake = undefined; resolve(); };
+        });
+        current = store.get(run.run_id)!;
+      }
+      if (disconnected) return;
+      const authorized = authenticate(request);
+      if (!visible(authorized, current)) throw new ApiError(404, 'run_not_found');
+      if (waitSeconds > 0 && current.terminal_at) {
+        send(response, 200, { ...publicRun(current), result: current.result,
+          artifacts: (current.artifacts ?? []).map(id => publicObject(store.object(id)!)) });
+      } else send(response, 202, publicRun(current));
+    } finally { response.removeListener('close', onClose); }
   }
   const server = createServer(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
@@ -89,7 +117,7 @@ export async function createApp(options: AppOptions) {
       const method = request.method ?? 'GET';
       if (method === 'POST' && request.headers.origin && request.headers.origin !== `http://${request.headers.host}` && request.headers.origin !== `https://${request.headers.host}`)
         throw new ApiError(403, 'origin_denied');
-      if (method === 'GET' && ['/', '/app.js', '/styles.css'].includes(path)) {
+      if (method === 'GET' && ['/', '/app.js', '/events.js', '/styles.css'].includes(path)) {
         const file = path === '/' ? 'index.html' : path.slice(1);
         const contents = await readFile(resolve('web', file));
         response.writeHead(200, { 'Content-Type': file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
@@ -101,9 +129,11 @@ export async function createApp(options: AppOptions) {
         request.headers.authorization = `Bearer ${payload.token}`;
         identity = authenticate(request);
         store.audit(identity.actor, identity.workspace, 'session.create', 'allowed');
-        for (const [key, value] of sessions) if (value.expires <= Date.now()) sessions.delete(key);
+        for (const [key, value] of sessions) if (value.expires <= clock()) sessions.delete(key);
+        const previousSession = request.headers.cookie?.match(/(?:^|; )atomic_session=([a-f0-9-]+)(?:;|$)/)?.[1];
+        if (previousSession) sessions.delete(previousSession);
         if (sessions.size >= 1000) throw new ApiError(503, 'session_capacity');
-        const session = randomUUID(); sessions.set(session, { identity, expires: Date.now() + 8 * 3600_000 });
+        const session = randomUUID(); sessions.set(session, { identity, expires: clock() + 8 * 3600_000 });
         response.setHeader('Set-Cookie', `atomic_session=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`);
         send(response, 200, { actor: identity.actor, workspace: identity.workspace, role: identity.role }); return;
       }
@@ -121,7 +151,7 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-03', submissions: store.submissionObservation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-04', submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -148,6 +178,10 @@ export async function createApp(options: AppOptions) {
         send(response, 200, publicObject(object)); return;
       }
       if (path === '/v1/runs' && method === 'POST') {
+        const waits = new URL(request.url!, 'http://localhost').searchParams.getAll('wait_seconds');
+        const waitSeconds = waits.length ? Number(waits[0]) : 0;
+        if (waits.length > 1 || (waits.length && !/^\d+(?:\.\d{1,3})?$/.test(waits[0]!)) ||
+            !Number.isFinite(waitSeconds) || waitSeconds < 0 || waitSeconds > 30) throw new ApiError(400, 'invalid_wait_seconds');
         const expectedActor = request.headers['x-submission-actor'];
         const expectedWorkspace = request.headers['x-submission-workspace'];
         if ((expectedActor !== undefined || expectedWorkspace !== undefined) &&
@@ -160,7 +194,7 @@ export async function createApp(options: AppOptions) {
         const requestDigest = contentDigest(input);
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
         const replay = store.replay(identity.actor, identity.workspace, key, requestDigest);
-        if (replay) { send(response, 202, publicRun(replay)); return; }
+        if (replay) { await replySubmission(request, response, replay, waitSeconds); return; }
         // Only this confirmed absent binding can authorize discarding a rejected pending submission.
         submissionNotAccepted = true;
         if (input.profile !== options.profile.id) throw new ApiError(400, 'config_unavailable');
@@ -180,7 +214,7 @@ export async function createApp(options: AppOptions) {
         run.manifest_digest = manifestDigest(run.manifest);
         submissionNotAccepted = false;
         const accepted = store.accept(run, key);
-        send(response, 202, publicRun(accepted)); worker.wake(); return;
+        worker.wake(); await replySubmission(request, response, accepted, waitSeconds); return;
       }
       if (path === '/v1/runs' && method === 'GET') {
         store.audit(identity.actor, identity.workspace, 'run.list', 'allowed');
@@ -216,10 +250,19 @@ export async function createApp(options: AppOptions) {
           response.end(bytes); return;
         }
       }
-      const match = path.match(/^\/v1\/runs\/([a-f0-9-]{36})(\/result)?$/);
+      const match = path.match(/^\/v1\/runs\/([a-f0-9-]{36})(\/result|\/events)?$/);
       if (match && method === 'GET') {
         const run = store.get(match[1]!);
         if (!run || !visible(identity, run)) throw new ApiError(404, 'run_not_found');
+        if (match[2] === '/events') {
+          const expectedActor = request.headers['x-observation-actor'];
+          const expectedWorkspace = request.headers['x-observation-workspace'];
+          if ((expectedActor !== undefined || expectedWorkspace !== undefined) &&
+              (expectedActor !== identity.actor || expectedWorkspace !== identity.workspace)) throw new ApiError(403, 'observation_identity_changed');
+          events.open(request, response, identity, run, () => {
+            if (!visible(authenticate(request), store.get(run.run_id)!)) throw new ApiError(404, 'run_not_found');
+          }); return;
+        }
         store.audit(identity.actor, identity.workspace, match[2] ? 'result.read' : 'run.read', 'allowed', run.run_id);
         if (match[2]) {
           if (run.status !== 'succeeded') throw new ApiError(409, 'result_unavailable');
@@ -233,6 +276,7 @@ export async function createApp(options: AppOptions) {
       const code = error instanceof ApiError ? error.code : 'service_unavailable';
       try { store.audit(identity?.actor ?? 'unauthenticated', identity?.workspace ?? null, 'request.reject', code); } catch { /* fail closed */ }
       if (!response.headersSent) send(response, status, { error: code,
+        ...(code === 'event_cursor_expired' || code === 'event_cursor_ahead' ? { recovery: 'query_run', run_url: new URL(request.url!, 'http://localhost').pathname.replace(/\/events$/, '') } : {}),
         ...(submissionNotAccepted && status >= 400 && status < 500 ? { submission_status: 'not_accepted' } : {}) }); else response.end();
     }
   });
@@ -245,6 +289,6 @@ export async function createApp(options: AppOptions) {
       if (!address || typeof address === 'string') throw new Error('listen_failed');
       return `http://127.0.0.1:${address.port}`;
     },
-    async close() { await new Promise<void>(resolve => server.close(() => resolve())); await worker.close(); store.close(); },
+    async close() { events.close(); await new Promise<void>(resolve => server.close(() => resolve())); await worker.close(); store.close(); },
   };
 }

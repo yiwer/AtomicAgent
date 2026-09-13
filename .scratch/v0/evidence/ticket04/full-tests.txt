@@ -1,0 +1,57 @@
+
+> atomicagent@0.0.1 test
+> tsx --test tests/*.test.ts
+
+✔ finite HTTP waiting returns a committed Result and replay changes no execution identity or deadline (126.0083ms)
+✔ expired cursors explicitly recover via the authoritative Run, while live sessions stop sending after rotation or expiry (657.0909ms)
+✔ SSE replays durable ordered identities after reconnect and restart without counting delivery as execution (90.9638ms)
+✔ a real 30-second HTTP wait and paused SSE socket release connections without stopping their Run (30657.9723ms)
+✔ wait validation, failed results, event authorization and connection quotas preserve authority (3247.5484ms)
+✔ a pre-events database exposes an explicit current snapshot directly to its authorized caller (86.8979ms)
+✔ a slow real HTTP consumer advances through a multi-page recovery backlog and resumes its last consumed cursor (2268.0219ms)
+✔ collection rejects required file symlinks instead of reading outside the task directory (12.2642ms)
+✔ oversized input and sparse output files are rejected before content processing (23.9825ms)
+✔ content acceptance handles many rows and categories without quadratic rescanning (172.4009ms)
+✔ uploaded CSV becomes an owned immutable InputObject only after content validation and survives restart (116.4847ms)
+✔ file task executes real code and delivers verified ordered bytes after sandbox cleanup and restart (369.3186ms)
+✔ equivalent JSON and changed decimal data are computed from actual input, not fixture answers (487.4516ms)
+✔ transient artifact transfer failures retry only storage and do not repeat Agent execution (220.0788ms)
+✔ JSON number lexemes retain exact decimal precision beyond JavaScript Number (237.3145ms)
+✔ input authorization and safe target rules reject before any execution (157.6877ms)
+✔ tampered input bytes fail preparation without executing or changing the accepted binding (79.702ms)
+✔ fabricated completion, missing JSON/files and corrupted output content never commit a Result (1344.1084ms)
+✔ links expire independently; source and artifact expiry block new use without rerunning an old key (340.121ms)
+✔ persistent transfer failure leaves no Result and cleanup debt retains identity until storage recovery (227.223ms)
+✔ Result, validation and artifact availability roll back together when the commit audit cannot persist (243.7217ms)
+✔ raw file upload validates UTF-8 and enforces the 50 MiB byte limit independently of JSON transport (104.1374ms)
+✔ upload audit preserves the authenticated initiator separately from platform validation (28.4614ms)
+✔ JSON member order does not change the identity of a file submission (312.6358ms)
+✔ same key conflicts for every changed execution field and is isolated by actor and workspace (230.1589ms)
+✔ submission and frozen manifest digests remain distinct across execution and restart, including failed Runs (53.6498ms)
+✔ health reports scoped durable acceptance, replay and conflict observations with freshness (89.0855ms)
+✔ only a confirmed absent key plus a business rejection reports that the submission was not accepted (108.2933ms)
+✔ real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial (140.4321ms)
+✔ an empty provider listing cannot close an unknown create operation (4.9119ms)
+✔ unwritable recovery records do not block disposal of later resources, and observations reconcile after recovery (136.9073ms)
+✔ a failed terminal write cannot prevent cleanup of the same already-started execution on restart (58.2878ms)
+✔ an existing matching profile allows disposal even when a SQLite writer lock prevents transactions (5656.0444ms)
+✔ a submitted task survives restart with a validated result and verified cleanup (116.7635ms)
+✔ invalid schema, missing input, and missing authorization fail without an authoritative result (195.437ms)
+✔ preparation failure cleans its allocated resource without starting an Attempt (37.2903ms)
+✔ cleanup uncertainty does not rewrite committed success and is retried on restart (44.6854ms)
+✔ authentication and server authorization isolate callers and health readers (166.5835ms)
+✔ concurrent duplicate submissions bind one Run, and changed content conflicts (81.6363ms)
+✔ the registered runner cannot silently be replaced by a different execution mode (1.0695ms)
+✔ a nonresponsive preparation cannot outlive the platform deadline or lose its cleanup obligation (1263.1375ms)
+✔ a registered profile revision cannot be changed in place across restart (23.2599ms)
+✔ a live registration cannot switch to a fixture or another provider before recovery (23.8284ms)
+✔ real TCP response loss and abrupt controller process death recover one Run and one controlled start (642.9689ms)
+ℹ upstream_acceptance=202; client_response=TCP_reset; concurrent_retries=16; controller_processes=2; Run=1; Attempt=1; controlled_SandboxPort_starts=1; actual_model_starts=unverified
+ℹ tests 44
+ℹ suites 0
+ℹ pass 44
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37428.656

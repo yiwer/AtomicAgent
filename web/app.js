@@ -1,7 +1,21 @@
+import { observeRun } from './events.js';
 const $ = id => document.getElementById(id);
 const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
 const errorText = { authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', submission_identity_changed: '登录身份已变化，请重新登录原身份后找回提交。', config_unavailable: '登记配置不可用。', idempotency_conflict: '原提交标识已绑定其他内容；已保留恢复材料，请核对原提交。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
 let me = null, selected = null, loading = false, pending = null, uploaded = null;
+let observation = null;
+function stopObservation() { observation?.stop(); observation = null; }
+function ensureObservation(id, identity) {
+  if (observation?.id === id && observation.identity === identity) return;
+  stopObservation(); $('event-progress').textContent = '等待进度事件；业务状态以任务查询为准';
+  const active = () => me === identity && selected === id;
+  observation = { id, identity, stop: observeRun({ id, identity,
+    onChange: async () => { if (active()) await renderDetail(id); },
+    onUnauthorized: () => { if (active()) loggedOut(); },
+    onStatus: text => { if (active()) $('event-status').textContent = text; },
+    onProgress: text => { if (active()) $('event-progress').textContent = text; },
+  }) };
+}
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const data = await response.json();
@@ -37,6 +51,7 @@ async function submitPending() {
   } finally { $('recover-submission').disabled = false; renderPending(); }
 }
 function loggedOut() {
+  stopObservation();
   me = null; selected = null; uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
   $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('detail').close();
@@ -73,6 +88,7 @@ async function renderDetail(id, open = false) {
   }
   if (!result?.artifacts?.length) $('artifacts').textContent = '尚无已交付文件';
   if (open && !$('detail').open) $('detail').showModal();
+  ensureObservation(id, identity);
 }
 async function refresh() {
   if (!me || loading) return;
@@ -150,6 +166,7 @@ $('upload-input').addEventListener('click', async () => {
 $('refresh').addEventListener('click', refresh);
 $('logout').addEventListener('click', async () => { try { await api('/auth/logout', { method: 'POST' }); location.hash = ''; loggedOut(); } catch (e) { showError(e); } });
 $('close-detail').addEventListener('click', () => $('detail').close());
-$('detail').addEventListener('close', () => { selected = null; history.replaceState(null, '', location.pathname); });
+$('detail').addEventListener('close', () => { stopObservation(); selected = null; history.replaceState(null, '', location.pathname); });
+window.addEventListener('pagehide', stopObservation);
 setInterval(() => { if (!document.hidden) void refresh(); }, 2000);
 connect().catch(() => loggedOut());

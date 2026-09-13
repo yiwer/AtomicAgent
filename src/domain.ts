@@ -33,6 +33,14 @@ export interface Run {
   result: { summary: string; value: number } | FileResult | null;
   artifacts?: string[];
 }
+export interface RunEvent {
+  version: 1; event_id: string; run_id: string; sequence: number;
+  occurred_at: string; recorded_at: string; type: 'run.progress' | 'run.snapshot';
+  source: 'platform:durable-run-state'; attempt_id: string | null;
+  status: Run['status']; phase: Run['phase']; failure: Run['failure'];
+  validation: 'passed' | 'failed' | null;
+  cleanup: { status: Run['cleanup']['status']; observed_at: string | null };
+}
 export interface SandboxPort {
   readonly source: string;
   prepare(run: Run): Promise<string>;

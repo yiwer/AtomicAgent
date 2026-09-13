@@ -52,6 +52,7 @@ test('A retains the unresolved request for its server identity across logout wit
   });
   await page.getByRole('button', { name: '提交任务', exact: true }).click();
   await expect(page.getByRole('button', { name: '找回未确认提交', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '找回未确认提交', exact: true })).toBeEnabled();
   await page.unroute('**/v1/runs');
   await page.getByRole('button', { name: '退出', exact: true }).click();
   await login('browser-other-test-credential-000000000000000000');

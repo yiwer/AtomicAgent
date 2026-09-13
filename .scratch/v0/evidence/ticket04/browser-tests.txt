@@ -1,0 +1,30 @@
+
+> atomicagent@0.0.1 test:browser
+> playwright test
+
+[WebServer] (node:27652) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:20344) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:10268) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:10268) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:28320) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28320) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 tests\console.spec.ts:2:1 › real browser logs in, submits, refreshes persistent details and recovers from network failure (4.1s)
+  ok 2 tests\console.spec.ts:30:1 › A uploads a real CSV, shows a persistent file Result and downloads after cleanup (3.6s)
+  ok 3 tests\events.spec.ts:3:1 › A resumes the same Run after closing its page and shows the durable Result independently of SSE text (2.6s)
+  ok 4 tests\events.spec.ts:24:1 › A recovers from network loss, deduplicates replay and treats done or EOF only as transport signals (3.7s)
+  ok 5 tests\events.spec.ts:50:1 › A reports an expired cursor and queries the authoritative Run (3.3s)
+  ok 6 tests\idempotency.spec.ts:3:1 › A recovers an accepted submission after response loss and page refresh without creating another task (2.7s)
+  ok 7 tests\idempotency.spec.ts:38:1 › A retains the unresolved request for its server identity across logout without resubmitting it for another identity (911ms)
+  ok 8 tests\idempotency.spec.ts:70:1 › a real authorization denial on recovery preserves the unresolved key until access returns (619ms)
+  ok 9 tests\idempotency.spec.ts:102:1 › another tab changing the shared session cannot submit an unresolved request under that identity (793ms)
+
+  9 passed (24.4s)

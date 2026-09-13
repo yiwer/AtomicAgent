@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { ApiError, now, type Profile, type Run, type StoredObject } from './domain.js';
+import { ApiError, now, type Profile, type Run, type RunEvent, type StoredObject } from './domain.js';
 import { submissionDigest } from './submission.js';
 
 interface AuditEvidence { source: string; resource_id: string | null; operation_id: string | null; observed_at: string }
@@ -15,6 +15,8 @@ export class Store {
       CREATE TABLE IF NOT EXISTS audit(seq INTEGER PRIMARY KEY, run_id TEXT, actor TEXT NOT NULL,
         workspace TEXT, action TEXT NOT NULL, outcome TEXT NOT NULL, recorded_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS objects(id TEXT PRIMARY KEY, document TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS run_events(run_id TEXT NOT NULL, sequence INTEGER NOT NULL, document TEXT NOT NULL,
+        PRIMARY KEY(run_id,sequence));
       CREATE TABLE IF NOT EXISTS registered_profile(id TEXT PRIMARY KEY, document TEXT NOT NULL);`);
     const columns = this.db.prepare('PRAGMA table_info(audit)').all().map(row => row.name);
     for (const column of ['source', 'resource_id', 'operation_id', 'observed_at']) {
@@ -56,6 +58,10 @@ export class Store {
     }
     return { source: 'platform:durable-submission-audit', observed_at: now(), counts };
   }
+  initializeEvents() {
+    // Called after resource recovery, before accepting work. Never invent past transitions.
+    for (const run of this.all()) if (!this.eventHead(run.run_id)) this.transaction(() => this.appendEvent(run, 'run.snapshot'));
+  }
   replay(owner: string, workspace: string, key: string, digest: string): Run | undefined {
     const row = this.db.prepare('SELECT document FROM runs WHERE workspace=? AND owner=? AND idempotency_key=?').get(workspace, owner, key);
     if (!row) return undefined;
@@ -78,6 +84,7 @@ export class Store {
       }
       this.db.prepare('INSERT INTO runs VALUES(?,?,?,?,?)').run(run.run_id, run.owner, run.workspace, key, JSON.stringify(run));
       this.audit(run.owner, run.workspace, 'run.accept', 'accepted', run.run_id);
+      this.appendEvent(run);
       this.audit('platform', run.workspace, 'grant.freeze', run.manifest.grant.inputs.length ? 'model-and-process-data@1' : 'model-only', run.run_id);
       for (const binding of run.manifest.grant.inputs) this.audit(run.owner, run.workspace, 'input.bind', 'fixed-authorized-content', run.run_id,
         { source: 'platform:input-object', resource_id: binding.file_id, operation_id: null, observed_at: now() });
@@ -92,11 +99,33 @@ export class Store {
   change(id: string, action: string, update: (run: Run) => void, observation?: { outcome: string; evidence: AuditEvidence }): Run {
     return this.transaction(() => {
       const run = this.get(id)!;
+      const previous = JSON.stringify(this.progress(run));
       update(run);
       this.db.prepare('UPDATE runs SET document=? WHERE id=?').run(JSON.stringify(run), id);
       this.audit('platform', run.workspace, action, observation?.outcome ?? run.failure ?? run.status, id, observation?.evidence);
+      if (JSON.stringify(this.progress(run)) !== previous) this.appendEvent(run);
       return run;
     });
+  }
+  private progress(run: Run) {
+    return { attempt_id: run.attempt_id, status: run.status, phase: run.phase, failure: run.failure,
+      validation: run.validation?.status ?? null, cleanup: { status: run.cleanup.status, observed_at: run.cleanup.observed_at } };
+  }
+  private appendEvent(run: Run, type: RunEvent['type'] = 'run.progress') {
+    const sequence = this.eventHead(run.run_id) + 1;
+    const timestamp = now();
+    const event: RunEvent = { version: 1, event_id: `${run.run_id}:${sequence}`, run_id: run.run_id, sequence,
+      occurred_at: timestamp, recorded_at: timestamp, type, source: 'platform:durable-run-state', ...this.progress(run) };
+    this.db.prepare('INSERT INTO run_events VALUES(?,?,?)').run(run.run_id, sequence, JSON.stringify(event));
+  }
+  eventHead(id: string): number { return Number(this.db.prepare('SELECT MAX(sequence) AS seq FROM run_events WHERE run_id=?').get(id)!.seq ?? 0); }
+  events(id: string, after: number): RunEvent[] {
+    return this.db.prepare('SELECT document FROM run_events WHERE run_id=? AND sequence>? ORDER BY sequence LIMIT 32')
+      .all(id, after).map(row => JSON.parse(row.document as string) as RunEvent);
+  }
+  eventObservation(workspace: string) {
+    const row = this.db.prepare('SELECT COUNT(*) AS total FROM run_events e JOIN runs r ON e.run_id=r.id WHERE r.workspace=?').get(workspace)!;
+    return { source: 'platform:durable-run-events', observed_at: now(), persisted: Number(row.total) };
   }
   objects(): StoredObject[] { return this.db.prepare('SELECT document FROM objects').all().map(r => JSON.parse(r.document as string) as StoredObject); }
   object(id: string): StoredObject | undefined {
