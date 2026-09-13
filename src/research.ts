@@ -65,7 +65,7 @@ export function researchServer(binding: McpBinding, signal: AbortSignal, record:
   const call: McpCall = { authorized: permitted(input), invocation_id: randomUUID(), source_id: permitted(input) ? input.source_id as McpCall['source_id'] : null, outcome: 'started', observed_at: now() };
   if (!permitted(input)) { call.outcome = 'denied'; await record(null, 'denied', call); throw new TaskError('authorization_required'); }
   const source = binding.sources.find(s => s.id === input.source_id)!;
-  if (pending.has(source.id)) throw new TaskError('required_capability_failed');
+  if (pending.has(source.id)) { call.authorized = false; call.outcome = 'denied'; await record(null, 'denied', call); throw new TaskError('required_capability_failed'); }
   pending.add(source.id); await record(null, 'intent', call);
   try {
   let text = source.snapshot, status: number | null = null;

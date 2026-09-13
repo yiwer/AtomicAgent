@@ -20,6 +20,10 @@ test('actual MCP initialization and list/call enforce exact source arguments; no
  }
  assert.equal((await client.callTool({ name: 'write_source', arguments: {} })).isError, true);
  assert.equal(service.receipts.length, 0); assert.ok(events.includes('denied'));
+ assert.equal((await client.callTool({ name: 'read_source', arguments: { source_id: 'opensandbox' } })).isError, undefined);
+ const before = events.filter(e => e === 'denied').length;
+ assert.equal((await client.callTool({ name: 'read_source', arguments: { source_id: 'opensandbox' } })).isError, true);
+ assert.equal(events.filter(e => e === 'denied').length, before + 1); assert.equal(service.receipts.length, 1);
 });
 
 test('Claude research path consumes protocol source calls, validates candidate, and writes ordinary report; journal failure refuses execution', async t => {
