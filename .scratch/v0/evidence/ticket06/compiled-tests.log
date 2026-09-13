@@ -1,0 +1,32 @@
+✔ controlled Claude SDK boundary isolates plugin discovery and records init separately from a successful Skill hook (19.8774ms)
+✔ a journal failure explicitly denies Skill permission even if the SDK swallows hook exceptions (10.9827ms)
+✔ Claude boundary fails closed for missing-entry and preserves distinct evidence (10.6809ms)
+✔ Claude boundary fails closed for no-skill-tool and preserves distinct evidence (11.6602ms)
+✔ Claude boundary fails closed for not-used and preserves distinct evidence (10.857ms)
+✔ Claude boundary fails closed for self-report and preserves distinct evidence (8.7656ms)
+✔ Claude boundary fails closed for tool-failure and preserves distinct evidence (10.2067ms)
+✔ Claude boundary fails closed for runtime-after-use and preserves distinct evidence (11.7013ms)
+✔ Claude boundary fails closed for missing-files and preserves distinct evidence (11.9921ms)
+✔ Claude boundary fails closed for post-journal-failure and preserves distinct evidence (11.0411ms)
+✔ fixed content mismatch never starts the engine and a subsequent no-Skill task inherits no capabilities (1.0174ms)
+✔ Skill args and other names cannot widen authorization through either callback (9.1185ms)
+✔ OpenSandbox command failure imports only matching bounded completed hook journal and never returns success (85.9299ms)
+✔ OpenSandbox command failure imports only matching bounded started hook journal and never returns success (10.9303ms)
+✔ OpenSandbox command failure imports only matching bounded wrong-attempt hook journal and never returns success (8.6544ms)
+✔ OpenSandbox command failure imports only matching bounded partial hook journal and never returns success (10.401ms)
+✔ OpenSandbox command failure imports only matching bounded oversized hook journal and never returns success (7.2064ms)
+✔ maintainer publishes fixed Skill and caller selects it through the ordinary file Result and Artifact path (217.1084ms)
+✔ required Skill cannot succeed from candidate claims or copied files without engine evidence (195.2027ms)
+✔ loaded and callable is distinct from used; optional use succeeds but must-use fails without invocation evidence (322.7529ms)
+✔ caller combines distinct fixed Skills; skill arguments, duplicate entries and unregistered revisions cannot widen grants (467.5245ms)
+✔ Skill disable and concurrent revisions preserve original Run and command recovery through restart and caller authorization (294.8762ms)
+✔ Skill publication audit failure rolls back revision and receipt; original command recovers after restart (70.1726ms)
+✔ wrong Attempt capability evidence fails and cannot create a Result or change the frozen manifest (128.6868ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1887.0359

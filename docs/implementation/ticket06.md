@@ -69,7 +69,7 @@ Run 顶层 `skills` 是可变观测；`execution.skills` 是固定选择的 id/v
 
 观测携带固定内容摘要、Attempt、时间、调用身份，出口按允许清单重建。file/init/PostToolUse 的来源分开显示。复制文件、未初始化、可调用未使用、hook失败均不能伪装must-use成功；使用Skill后未产出普通文件仍被原文件验证器拒绝。
 
-Skill许可前以独立runner权限写入有界fsync journal（最多40条），写入失败明确deny、abort并锁定必需能力失败。Post写入失败不保留used=true。API导入后Skill观测和每个完成调用审计与Run事实同SQLite事务保存；关键记录失败不得交付成功。模型无权限写journal，固定Bash程序也不触碰该文件。此本地受控日志是sandbox内阶段证据，不冒充已持久转存到平台的完整调用历史。
+Skill许可前由受控runner写入有界fsync journal（最多40条），写入失败明确deny、abort并锁定必需能力失败。Post写入失败不保留used=true。API导入后Skill观测和每个完成调用审计与Run事实同SQLite事务保存；关键记录失败不得交付成功。runner与Claude进程沿用uid1000；此票的保护来自精确工具允许集：模型不能选择任意文件写入动作，唯一Bash程序也不触碰journal。这里没有新增不同OS身份或文件权限隔离证明，Linux隔离仍需真实部署验收。此本地受控日志是sandbox内阶段证据，不冒充已持久转存到平台的完整调用历史。
 
 OpenSandbox成功包和异常退出后读取的journal均须通过固定摘要／Attempt检查；journal还需Run匹配、完整换行、最多256000 bytes及40行。无结果包、错Attempt、截断／超限、到期后迟到callback保持未知或拒绝，不重启Agent。回收后不能再读取的未导入证据保持unknown。本票没有阶段重试或整项重跑入口。
 
@@ -84,3 +84,5 @@ OpenSandbox成功包和异常退出后读取的journal均须通过固定摘要�
 ## 验证与审查
 
 具体命令、计数和审查见 [实施证据](../../.scratch/v0/evidence/ticket06/implementation.md) 和 [双轴审查](../../.scratch/v0/evidence/ticket06/review.md)。真实模型、真实资源隔离／清理、人工验收均未执行。
+
+本地最终验证：完整确定性78/78、Chromium14/14、本票聚焦24/24、编译后聚焦24/24；typecheck/build及编译入口重启通过。checkpoint为`9126dccc586a341f37c2b782b04425dec5b79284`。独立双轴审查：Standards无硬违规、1项P3维护建议已记录，Spec无可确认实现缺口。后续文档提交不改变产品实现；上述真实验收保持未完成。
