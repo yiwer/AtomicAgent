@@ -9,6 +9,7 @@ import { Worker } from './worker.js';
 import { Files, publicObject, sha256 } from './files.js';
 import { DiskBlobs, type BlobPort } from './blob-store.js';
 import { fileSchema, ARTIFACT_LIMIT, INPUT_LIMIT } from './file-contract.js';
+import { contentDigest, manifestDigest, submissionDigest } from './submission.js';
 
 interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort }
 const digest = (value: string) => createHash('sha256').update(value).digest();
@@ -16,9 +17,10 @@ function publicRun(run: Run) {
   return {
     run_id: run.run_id, status: run.status, phase: run.phase, failure: run.failure,
     accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
+    submission_digest: submissionDigest(run),
     cleanup: run.cleanup, validation: run.validation,
     inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded }) => ({ file_id, path, sha256, size_bytes, loaded })),
-    execution: { profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
+    execution: { manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
       sdk: run.manifest.profile.sdk, cli: run.manifest.profile.cli, node: run.manifest.profile.node,
       image: run.manifest.profile.image, deadline_at: run.manifest.deadline_at, output_contract: run.manifest.output_contract },
   };
@@ -118,7 +120,7 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-02', object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-03', submissions: store.submissionObservation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -150,24 +152,25 @@ export async function createApp(options: AppOptions) {
         if (typeof key !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(key)) throw new ApiError(400, 'idempotency_key_required');
         if (Object.keys(input).some(k => !['prompt', 'profile', 'output_contract', 'inputs'].includes(k)) ||
             typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 8000) throw new ApiError(400, 'invalid_request');
-        if (input.profile !== options.profile.id) throw new ApiError(400, 'config_unavailable');
-        if (!['summary-value@1', 'data-statistics@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
-        const requestDigest = digest(JSON.stringify(input.output_contract === 'data-statistics@1' ? [input.prompt, input.profile, input.output_contract, input.inputs ?? []] : [input.prompt, input.profile, input.output_contract])).toString('hex');
+        const requestDigest = contentDigest(input);
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
         const replay = store.replay(identity.actor, identity.workspace, key, requestDigest);
         if (replay) { send(response, 202, publicRun(replay)); return; }
+        if (input.profile !== options.profile.id) throw new ApiError(400, 'config_unavailable');
+        if (!['summary-value@1', 'data-statistics@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
         const bindings = input.output_contract === 'data-statistics@1' ? files.bind(identity, input.inputs) : [];
         if (input.output_contract === 'summary-value@1' && input.inputs !== undefined) throw new ApiError(400, 'invalid_request');
         const acceptedAt = now();
         const run: Run = {
           run_id: randomUUID(), owner: identity.actor, workspace: identity.workspace, prompt: input.prompt,
-          request_digest: requestDigest,
+          request_digest: requestDigest, request_digest_version: 2,
           manifest: { profile: structuredClone(options.profile), output_contract: input.output_contract as Run['manifest']['output_contract'], schema: bindings.length ? fileSchema : outputSchema,
             grant: { tools: bindings.length ? ['process-data@1'] : [], mcp: [], inputs: bindings, external_access: 'model-only' },
             deadline_at: new Date(Date.now() + options.profile.timeout_seconds * 1000).toISOString() },
           status: 'queued', phase: 'queued', failure: null, accepted_at: acceptedAt, terminal_at: null, attempt_id: null,
           allocation: null, cleanup: { status: 'pending', observed_at: null, source: null }, validation: null, result: null,
         };
+        run.manifest_digest = manifestDigest(run.manifest);
         const accepted = store.accept(run, key);
         send(response, 202, publicRun(accepted)); worker.wake(); return;
       }

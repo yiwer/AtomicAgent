@@ -7,15 +7,39 @@ async function api(path, options = {}) {
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 401) loggedOut();
-    throw new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`);
+    throw Object.assign(new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`), { status: response.status });
   }
   return data;
 }
 function showError(error) { $('error').textContent = error instanceof Error ? error.message : '连接失败，请重试。'; $('error').hidden = false; }
+const pendingStorageKey = identity => `atomicagent.pending:${JSON.stringify([identity.workspace, identity.actor])}`;
+function renderPending() {
+  $('pending-submission').hidden = !pending;
+  $('submit').disabled = !!pending;
+}
+async function submitPending() {
+  const identity = me, submission = pending;
+  if (!identity || !submission) return;
+  $('recover-submission').disabled = true;
+  try {
+    const run = await api('/v1/runs', { method: 'POST', headers: { 'Idempotency-Key': submission.key }, body: submission.body });
+    sessionStorage.removeItem(pendingStorageKey(identity));
+    if (me !== identity) return;
+    pending = null; selected = run.run_id; location.hash = run.run_id; await refresh();
+  } catch (error) {
+    // A definitive rejection allows correction; unknown delivery and identity/conflict errors retain the original request.
+    if (error.status >= 400 && error.status < 500 && ![401, 409].includes(error.status)) {
+      sessionStorage.removeItem(pendingStorageKey(identity));
+      if (me === identity) pending = null;
+    }
+    showError(error);
+  } finally { $('recover-submission').disabled = false; renderPending(); }
+}
 function loggedOut() {
   me = null; selected = null; uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
   $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('detail').close();
+  renderPending();
 }
 function node(tag, text, className) { const element = document.createElement(tag); element.textContent = text; if (className) element.className = className; return element; }
 function pill(state) { return node('span', statusText[state] ?? state, `pill ${state}`); }
@@ -78,6 +102,7 @@ async function refresh() {
 }
 async function connect() {
   me = await api('/v1/me'); $('login').hidden = true; $('workspace').hidden = false; $('logout').hidden = false; $('refresh').hidden = false;
+  pending = JSON.parse(sessionStorage.getItem(pendingStorageKey(me)) ?? 'null'); renderPending();
   $('identity').textContent = `${me.workspace} / ${me.actor} · ${me.role}`; $('nav-workspace').textContent = me.workspace;
   $('profile').textContent = me.profile;
   $('mode').textContent = me.mode === 'fixture' ? '确定性实验模式：任务经过真实 API 与持久化；执行端为受控替身；文件任务运行本地真实代码，不调用模型，也不创建 Docker 资源。' : '真实实验模式：使用服务端登记的 OpenSandbox 与模型配置。';
@@ -92,17 +117,19 @@ $('login-form').addEventListener('submit', async event => {
 $('submit-form').addEventListener('submit', async event => {
   event.preventDefault(); $('submit').disabled = true;
   try {
+    if (pending) { await submitPending(); return; }
     if ($('input-file').files.length && !uploaded) throw new Error('请先上传并校验输入文件。');
     const request = { prompt: $('prompt').value, profile: me.profile, output_contract: uploaded ? 'data-statistics@1' : me.output_contract,
       ...(uploaded ? { inputs: [{ file_id: uploaded.file_id, path: `input/data.${uploaded.format}` }] } : {}) };
-    if (!pending || pending.body !== JSON.stringify(request)) pending = { key: crypto.randomUUID(), body: JSON.stringify(request) };
-    const run = await api('/v1/runs', { method: 'POST', headers: { 'Idempotency-Key': pending.key }, body: pending.body });
-    pending = null; selected = run.run_id; location.hash = run.run_id; await refresh();
+    const submission = { key: crypto.randomUUID(), body: JSON.stringify(request) };
+    sessionStorage.setItem(pendingStorageKey(me), JSON.stringify(submission));
+    pending = submission; renderPending(); await submitPending();
   } catch (e) { showError(e); }
-  finally { $('submit').disabled = false; }
+  finally { renderPending(); }
 });
-$('input-file').addEventListener('change', () => { uploaded = null; pending = null; $('input-status').textContent = '文件待上传校验'; });
-$('clear-input').addEventListener('click', () => { uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; });
+$('recover-submission').addEventListener('click', submitPending);
+$('input-file').addEventListener('change', () => { uploaded = null; $('input-status').textContent = '文件待上传校验'; });
+$('clear-input').addEventListener('click', () => { uploaded = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; });
 $('upload-input').addEventListener('click', async () => {
   const file = $('input-file').files[0]; $('upload-input').disabled = true;
   try {
@@ -111,7 +138,7 @@ $('upload-input').addEventListener('click', async () => {
     const identity = me;
     const object = await api('/v1/files', { method: 'POST', headers: { 'X-File-Format': file.name.split('.').pop().toLowerCase(), 'Content-Type': 'application/octet-stream' }, body: file });
     if (me !== identity || $('input-file').files[0] !== file) return;
-    uploaded = object; pending = null;
+    uploaded = object;
     $('input-status').textContent = `已校验 · ${object.size_bytes} bytes · ${object.file_id} · 保留至 ${new Date(object.expires_at).toLocaleString('zh-CN')}`;
     $('prompt').value = '按十进制处理输入数据。负数和零有效，非数字行进入拒绝清单；保持输入顺序，输出有效 CSV、拒绝 JSON 和统计。';
     $('error').hidden = true;

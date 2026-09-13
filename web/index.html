@@ -7,7 +7,7 @@
     <span class="nav-item muted">运维总览 <small>未接入</small></span><span class="nav-item muted">资源回收 <small>未接入</small></span>
     <p class="nav-label">能力与配置</p><span class="nav-item muted">环境与模型 <small>未接入</small></span><span class="nav-item muted">Skills · MCP <small>未接入</small></span>
     <p class="nav-label">平台治理</p><span class="nav-item muted">权限与审计 <small>未接入</small></span>
-    <footer>独立任务 · 明确交付<br>v0 / ticket01–02</footer>
+    <footer>独立任务 · 明确交付<br>v0 / ticket01–03</footer>
   </aside>
   <div class="layout"><header><span>工作区 / 任务运行</span><div><span id="identity">未登录</span><button id="logout" hidden>退出</button></div></header>
     <main>
@@ -20,6 +20,7 @@
         <p id="mode" class="notice"></p>
         <div class="content-grid"><div class="stack">
           <section id="submission" class="card"><div class="section-head"><h2>新建任务</h2><span class="muted">提示词或文件处理</span></div>
+            <p id="pending-submission" class="notice" hidden>上次提交的响应尚未确认。找回会使用原提交内容；确认后可创建新任务。<button id="recover-submission" type="button">找回未确认提交</button></p>
             <form id="submit-form"><label for="prompt">任务提示词</label><textarea id="prompt" rows="3" maxlength="8000" required>请仅返回 JSON：summary 为 "three apples"，value 为整数 3。</textarea>
               <label for="input-file">输入 CSV / JSON</label><input id="input-file" type="file" accept=".csv,.json"><button id="upload-input" type="button">上传输入</button><button id="clear-input" type="button">清除输入</button><p id="input-status" class="muted">未绑定文件 · 提交提示词任务</p>
               <div class="form-foot"><small>上传文件后按十进制规则处理，交付有效 CSV、拒绝 JSON 和统计。</small><button class="primary" id="submit" type="submit">提交任务</button></div></form>

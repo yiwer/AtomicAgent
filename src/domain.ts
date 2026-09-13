@@ -21,6 +21,7 @@ export class ApiError extends Error {
 }
 export interface Run {
   run_id: string; owner: string; workspace: string; request_digest: string; prompt: string;
+  request_digest_version?: 2; manifest_digest?: string;
   manifest: { profile: Profile; output_contract: 'summary-value@1' | 'data-statistics@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema;
     grant: { tools: string[]; mcp: []; inputs: InputBinding[]; external_access: 'model-only' }; deadline_at: string };
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out';

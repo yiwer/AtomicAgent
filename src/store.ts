@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { ApiError, now, type Profile, type Run, type StoredObject } from './domain.js';
+import { submissionDigest } from './submission.js';
 
 interface AuditEvidence { source: string; resource_id: string | null; operation_id: string | null; observed_at: string }
 
@@ -48,11 +49,21 @@ export class Store {
       .run(id, actor, workspace, action, outcome, now(), evidence?.source ?? 'platform', evidence?.resource_id ?? null,
         evidence?.operation_id ?? null, evidence?.observed_at ?? null);
   }
+  submissionObservation(workspace: string) {
+    const counts = { accepted: 0, replayed: 0, conflict: 0 };
+    for (const row of this.db.prepare("SELECT outcome, COUNT(*) AS total FROM audit WHERE workspace=? AND action='run.accept' GROUP BY outcome").all(workspace)) {
+      if (row.outcome === 'accepted' || row.outcome === 'replayed' || row.outcome === 'conflict') counts[row.outcome] = Number(row.total);
+    }
+    return { source: 'platform:durable-submission-audit', observed_at: now(), counts };
+  }
   replay(owner: string, workspace: string, key: string, digest: string): Run | undefined {
     const row = this.db.prepare('SELECT document FROM runs WHERE workspace=? AND owner=? AND idempotency_key=?').get(workspace, owner, key);
     if (!row) return undefined;
     const run = JSON.parse(row.document as string) as Run;
-    if (run.request_digest !== digest) throw new ApiError(409, 'idempotency_conflict');
+    if (submissionDigest(run) !== digest) {
+      this.audit(owner, workspace, 'run.accept', 'conflict', run.run_id);
+      throw new ApiError(409, 'idempotency_conflict');
+    }
     this.audit(owner, workspace, 'run.accept', 'replayed', run.run_id); return run;
   }
   accept(run: Run, key: string): Run {
@@ -61,7 +72,7 @@ export class Store {
         .get(run.workspace, run.owner, key);
       if (row) {
         const existing = JSON.parse(row.document as string) as Run;
-        if (existing.request_digest !== run.request_digest) throw new ApiError(409, 'idempotency_conflict');
+        if (submissionDigest(existing) !== run.request_digest) throw new ApiError(409, 'idempotency_conflict');
         this.audit(run.owner, run.workspace, 'run.accept', 'replayed', existing.run_id);
         return existing;
       }
