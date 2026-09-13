@@ -1,0 +1,9 @@
+id,category,value
+r01,alpha,10
+r02,beta,20
+r03,alpha,15
+r04,beta,invalid
+r05,alpha,-5
+r06,beta,0
+r07,alpha,2.5
+r08,beta,7.5

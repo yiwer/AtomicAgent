@@ -7,7 +7,7 @@
     <span class="nav-item muted">运维总览 <small>未接入</small></span><span class="nav-item muted">资源回收 <small>未接入</small></span>
     <p class="nav-label">能力与配置</p><span class="nav-item muted">环境与模型 <small>未接入</small></span><span class="nav-item muted">Skills · MCP <small>未接入</small></span>
     <p class="nav-label">平台治理</p><span class="nav-item muted">权限与审计 <small>未接入</small></span>
-    <footer>独立任务 · 明确交付<br>v0 / ticket01</footer>
+    <footer>独立任务 · 明确交付<br>v0 / ticket01–02</footer>
   </aside>
   <div class="layout"><header><span>工作区 / 任务运行</span><div><span id="identity">未登录</span><button id="logout" hidden>退出</button></div></header>
     <main>
@@ -19,9 +19,10 @@
       <div id="workspace" hidden>
         <p id="mode" class="notice"></p>
         <div class="content-grid"><div class="stack">
-          <section id="submission" class="card"><div class="section-head"><h2>新建任务</h2><span class="muted">固定契约 · summary + value</span></div>
+          <section id="submission" class="card"><div class="section-head"><h2>新建任务</h2><span class="muted">提示词或文件处理</span></div>
             <form id="submit-form"><label for="prompt">任务提示词</label><textarea id="prompt" rows="3" maxlength="8000" required>请仅返回 JSON：summary 为 "three apples"，value 为整数 3。</textarea>
-              <div class="form-foot"><small>只接受提示词。结果包含 summary 文本与 value 整数。</small><button class="primary" id="submit" type="submit">提交任务</button></div></form>
+              <label for="input-file">输入 CSV / JSON</label><input id="input-file" type="file" accept=".csv,.json"><button id="upload-input" type="button">上传输入</button><button id="clear-input" type="button">清除输入</button><p id="input-status" class="muted">未绑定文件 · 提交提示词任务</p>
+              <div class="form-foot"><small>上传文件后按十进制规则处理，交付有效 CSV、拒绝 JSON 和统计。</small><button class="primary" id="submit" type="submit">提交任务</button></div></form>
           </section>
           <section id="run-list" class="card"><div class="section-head"><h2>任务列表</h2><small id="updated">等待读取</small></div>
             <div class="table-wrap"><table><thead><tr><th>任务 / 接受时间</th><th>业务状态</th><th>回收状态</th><th></th></tr></thead><tbody id="runs"></tbody></table></div>
@@ -35,6 +36,6 @@
     </main>
   </div>
   <dialog id="detail"><div class="detail-head"><div><p class="eyebrow">RUN DETAIL</p><h2>任务详情</h2></div><button id="close-detail" aria-label="关闭详情">关闭</button></div>
-    <p id="detail-id" class="mono"></p><dl id="facts"></dl><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>固定执行依据</h3><pre id="manifest"></pre>
+    <p id="detail-id" class="mono"></p><dl id="facts"></dl><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>任务产物</h3><div id="artifacts"></div><p id="artifact-error" role="status"></p><h3>固定执行依据</h3><pre id="manifest"></pre>
   </dialog>
 </body></html>

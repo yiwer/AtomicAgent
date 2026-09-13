@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { ApiError, now, type Profile, type Run } from './domain.js';
+import { ApiError, now, type Profile, type Run, type StoredObject } from './domain.js';
 
 interface AuditEvidence { source: string; resource_id: string | null; operation_id: string | null; observed_at: string }
 
@@ -13,6 +13,7 @@ export class Store {
         idempotency_key TEXT NOT NULL, document TEXT NOT NULL, UNIQUE(workspace,owner,idempotency_key));
       CREATE TABLE IF NOT EXISTS audit(seq INTEGER PRIMARY KEY, run_id TEXT, actor TEXT NOT NULL,
         workspace TEXT, action TEXT NOT NULL, outcome TEXT NOT NULL, recorded_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS objects(id TEXT PRIMARY KEY, document TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS registered_profile(id TEXT PRIMARY KEY, document TEXT NOT NULL);`);
     const columns = this.db.prepare('PRAGMA table_info(audit)').all().map(row => row.name);
     for (const column of ['source', 'resource_id', 'operation_id', 'observed_at']) {
@@ -47,6 +48,13 @@ export class Store {
       .run(id, actor, workspace, action, outcome, now(), evidence?.source ?? 'platform', evidence?.resource_id ?? null,
         evidence?.operation_id ?? null, evidence?.observed_at ?? null);
   }
+  replay(owner: string, workspace: string, key: string, digest: string): Run | undefined {
+    const row = this.db.prepare('SELECT document FROM runs WHERE workspace=? AND owner=? AND idempotency_key=?').get(workspace, owner, key);
+    if (!row) return undefined;
+    const run = JSON.parse(row.document as string) as Run;
+    if (run.request_digest !== digest) throw new ApiError(409, 'idempotency_conflict');
+    this.audit(owner, workspace, 'run.accept', 'replayed', run.run_id); return run;
+  }
   accept(run: Run, key: string): Run {
     return this.transaction(() => {
       const row = this.db.prepare('SELECT document FROM runs WHERE workspace=? AND owner=? AND idempotency_key=?')
@@ -59,7 +67,9 @@ export class Store {
       }
       this.db.prepare('INSERT INTO runs VALUES(?,?,?,?,?)').run(run.run_id, run.owner, run.workspace, key, JSON.stringify(run));
       this.audit(run.owner, run.workspace, 'run.accept', 'accepted', run.run_id);
-      this.audit('platform', run.workspace, 'grant.freeze', 'model-only', run.run_id);
+      this.audit('platform', run.workspace, 'grant.freeze', run.manifest.grant.inputs.length ? 'model-and-process-data@1' : 'model-only', run.run_id);
+      for (const binding of run.manifest.grant.inputs) this.audit(run.owner, run.workspace, 'input.bind', 'fixed-authorized-content', run.run_id,
+        { source: 'platform:input-object', resource_id: binding.file_id, operation_id: null, observed_at: now() });
       return run;
     });
   }
@@ -76,6 +86,14 @@ export class Store {
       this.audit('platform', run.workspace, action, observation?.outcome ?? run.failure ?? run.status, id, observation?.evidence);
       return run;
     });
+  }
+  objects(): StoredObject[] { return this.db.prepare('SELECT document FROM objects').all().map(r => JSON.parse(r.document as string) as StoredObject); }
+  object(id: string): StoredObject | undefined {
+    const row = this.db.prepare('SELECT document FROM objects WHERE id=?').get(id);
+    return row ? JSON.parse(row.document as string) as StoredObject : undefined;
+  }
+  saveObject(object: StoredObject) {
+    this.db.prepare('INSERT INTO objects VALUES(?,?) ON CONFLICT(id) DO UPDATE SET document=excluded.document').run(object.object_id, JSON.stringify(object));
   }
   close() { this.db.close(); }
 }

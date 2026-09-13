@@ -27,3 +27,26 @@ test('real browser logs in, submits, refreshes persistent details and recovers f
   await expect(page.locator('#login')).toBeVisible();
   expect(errors).toEqual([]);
 });
+test('A uploads a real CSV, shows a persistent file Result and downloads after cleanup', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('访问令牌').fill('browser-test-only-credential-00000000000000000000');
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.getByLabel('输入 CSV / JSON').setInputFiles({ name: 'data.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('id,category,value\nr01,alpha,10\nr02,beta,20\nr03,alpha,15\nr04,beta,invalid\nr05,alpha,-5\nr06,beta,0\nr07,alpha,2.5\nr08,beta,7.5\n') });
+  await page.getByRole('button', { name: '上传输入', exact: true }).click();
+  await expect(page.locator('#input-status')).toContainText('已校验');
+  await page.getByRole('button', { name: '提交任务', exact: true }).click();
+  await expect(page.locator('#result')).toContainText('"total": "50"');
+  await expect(page.locator('#facts')).toContainText('已核验回收');
+  await page.reload();
+  await expect(page.locator('#artifacts')).toContainText('output/valid.csv');
+  const event = page.waitForEvent('download');
+  await page.getByRole('button', { name: '下载 output/valid.csv', exact: true }).click();
+  const download = await event;
+  expect(download.suggestedFilename()).toBe('valid.csv');
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = []; for await (const chunk of stream!) chunks.push(chunk);
+  expect(Buffer.concat(chunks).toString()).toContain('r07,alpha,2.5');
+  expect(Buffer.concat(chunks).toString()).not.toContain('r04');
+  await page.screenshot({ path: 'test-results/ticket02-file-detail.png', fullPage: true });
+});

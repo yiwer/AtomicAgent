@@ -1,0 +1,20 @@
+✔ uploaded CSV becomes an owned immutable InputObject only after content validation and survives restart (78.8182ms)
+✔ file task executes real code and delivers verified ordered bytes after sandbox cleanup and restart (234.2894ms)
+✔ equivalent JSON and changed decimal data are computed from actual input, not fixture answers (346.3384ms)
+✔ transient artifact transfer failures retry only storage and do not repeat Agent execution (156.2324ms)
+✔ JSON number lexemes retain exact decimal precision beyond JavaScript Number (174.8601ms)
+✔ input authorization and safe target rules reject before any execution (171.4959ms)
+✔ tampered input bytes fail preparation without executing or changing the accepted binding (62.2691ms)
+✔ fabricated completion, missing JSON/files and corrupted output content never commit a Result (922.9994ms)
+✔ links expire independently; source and artifact expiry block new use without rerunning an old key (213.9098ms)
+✔ persistent transfer failure leaves no Result and cleanup debt retains identity until storage recovery (165.2961ms)
+✔ Result, validation and artifact availability roll back together when the commit audit cannot persist (196.8834ms)
+✔ raw file upload validates UTF-8 and enforces the 50 MiB byte limit independently of JSON transport (104.2574ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2968.2429

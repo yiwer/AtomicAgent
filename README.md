@@ -4,6 +4,8 @@
 
 - [ticket01 启动、API 合约与验证账本](docs/implementation/ticket01.md)：首次 `npm ci` → `npm run setup:local` → `npm run build` → `npm start`，访问 `http://127.0.0.1:4310`。默认明确使用确定性实验替身。
 
+- [ticket02 文件上传、统计、清理后下载与验证账本](docs/implementation/ticket02.md)：真实临时文件／代码执行的确定性验证已实现，真实模型门槛仍独立。
+
 - [v0 产品需求文档（PRD）](docs/PRD-v0.md)
 - [33 张实施票、依赖与验收覆盖](.scratch/v0/ticket-plan.md)
 - [本地 tracker 约定](docs/agents/issue-tracker.md)

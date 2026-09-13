@@ -1,0 +1,10 @@
+[
+  {"id":"r01","category":"alpha","value":"10"},
+  {"id":"r02","category":"beta","value":"20"},
+  {"id":"r03","category":"alpha","value":"15"},
+  {"id":"r04","category":"beta","value":"invalid"},
+  {"id":"r05","category":"alpha","value":"-5"},
+  {"id":"r06","category":"beta","value":"0"},
+  {"id":"r07","category":"alpha","value":"2.5"},
+  {"id":"r08","category":"beta","value":"7.5"}
+]

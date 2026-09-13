@@ -34,3 +34,5 @@
 ## Comments
 
 - 2026-09-14：根据用户“接受”发布；尚未开始产品实现或验收。
+
+- 2026-09-14：按本轮持续推进授权，在干净 main／`b3d03146241cca9c21ecee23c56e31606d9f908d` 基线开始实现，使用全新 subagent 上下文及 implement／TDD。已实现输入、真实文件处理、独立内容验收、原子交付、授权下载与 A；见 [实施与演示](../../../docs/implementation/ticket02.md) 和 [验证证据](../evidence/ticket02/verification.md)。真实 OpenSandbox／Claude／部署／人工综合验收仍待外部输入，不勾选综合 AC，不关闭前票或修改依赖图。

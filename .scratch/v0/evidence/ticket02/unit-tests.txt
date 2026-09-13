@@ -1,0 +1,42 @@
+
+> atomicagent@0.0.1 test
+> tsx --test tests/*.test.ts
+
+✔ collection rejects required file symlinks instead of reading outside the task directory (10.61ms)
+✔ oversized input and sparse output files are rejected before content processing (23.2222ms)
+✔ content acceptance handles many rows and categories without quadratic rescanning (148.92ms)
+✔ uploaded CSV becomes an owned immutable InputObject only after content validation and survives restart (111.0074ms)
+✔ file task executes real code and delivers verified ordered bytes after sandbox cleanup and restart (343.5687ms)
+✔ equivalent JSON and changed decimal data are computed from actual input, not fixture answers (471.0167ms)
+✔ transient artifact transfer failures retry only storage and do not repeat Agent execution (220.5828ms)
+✔ JSON number lexemes retain exact decimal precision beyond JavaScript Number (239.1798ms)
+✔ input authorization and safe target rules reject before any execution (173.2827ms)
+✔ tampered input bytes fail preparation without executing or changing the accepted binding (76.7281ms)
+✔ fabricated completion, missing JSON/files and corrupted output content never commit a Result (1342.8011ms)
+✔ links expire independently; source and artifact expiry block new use without rerunning an old key (317.2554ms)
+✔ persistent transfer failure leaves no Result and cleanup debt retains identity until storage recovery (228.1508ms)
+✔ Result, validation and artifact availability roll back together when the commit audit cannot persist (272.6049ms)
+✔ raw file upload validates UTF-8 and enforces the 50 MiB byte limit independently of JSON transport (101.5779ms)
+✔ real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial (120.7882ms)
+✔ an empty provider listing cannot close an unknown create operation (6.3847ms)
+✔ unwritable recovery records do not block disposal of later resources, and observations reconcile after recovery (106.0114ms)
+✔ a failed terminal write cannot prevent cleanup of the same already-started execution on restart (59.7797ms)
+✔ an existing matching profile allows disposal even when a SQLite writer lock prevents transactions (5609.1469ms)
+✔ a submitted task survives restart with a validated result and verified cleanup (92.4013ms)
+✔ invalid schema, missing input, and missing authorization fail without an authoritative result (149.6592ms)
+✔ preparation failure cleans its allocated resource without starting an Attempt (27.8318ms)
+✔ cleanup uncertainty does not rewrite committed success and is retried on restart (45.4687ms)
+✔ authentication and server authorization isolate callers and health readers (170.231ms)
+✔ concurrent duplicate submissions bind one Run, and changed content conflicts (64.8168ms)
+✔ the registered runner cannot silently be replaced by a different execution mode (1.1908ms)
+✔ a nonresponsive preparation cannot outlive the platform deadline or lose its cleanup obligation (1257.4063ms)
+✔ a registered profile revision cannot be changed in place across restart (32.4048ms)
+✔ a live registration cannot switch to a fixture or another provider before recovery (25.2345ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6143.9046

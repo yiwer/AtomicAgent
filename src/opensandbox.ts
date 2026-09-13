@@ -1,5 +1,7 @@
 import { Sandbox, SandboxManager, SandboxApiException, type ConnectionConfigOptions } from '@alibaba-group/opensandbox';
-import { TaskError, type Run, type SandboxPort } from './domain.js';
+import { ARTIFACT_LIMIT, INPUT_LIMIT } from './file-contract.js';
+import { sha256 } from './files.js';
+import { TaskError, type Run, type SandboxPort, type LoadedInput } from './domain.js';
 
 // Only this adapter may contact the provider. No request may supply endpoints, commands, credentials or images.
 export class OpenSandboxAdapter implements SandboxPort {
@@ -21,6 +23,20 @@ export class OpenSandboxAdapter implements SandboxPort {
     });
     try { return sandbox.id; } finally { await sandbox.close(); }
   }
+  async loadInputs(run: Run, inputs: LoadedInput[]) {
+    const sandbox = await Sandbox.connect({ sandboxId: run.allocation!.resource_id!, connectionConfig: this.config(run), readyTimeoutSeconds: 10 });
+    try {
+      await sandbox.files.createDirectories([{ path: '/workspace/input', mode: 0o700, owner: 'node', group: 'node' }]);
+      for (const input of inputs) {
+        const path = `/workspace/${input.binding.path}`;
+        await sandbox.files.writeFiles([{ path, data: input.bytes, mode: 0o400, owner: 'node', group: 'node' }]);
+        const info = (await sandbox.files.getFileInfo([path]))[path];
+        if (info?.type !== 'file' || info.size !== input.binding.size_bytes) throw new TaskError('input_required');
+        const copy = await sandbox.files.readBytes(path, { limit: INPUT_LIMIT + 1 });
+        if (copy.length !== input.binding.size_bytes || sha256(copy) !== input.binding.sha256) throw new TaskError('input_required');
+      }
+    } finally { await sandbox.close(); }
+  }
   async execute(run: Run, signal: AbortSignal): Promise<unknown> {
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation!.resource_id!, connectionConfig: this.config(run), readyTimeoutSeconds: 10 });
     try {
@@ -28,6 +44,8 @@ export class OpenSandboxAdapter implements SandboxPort {
       await sandbox.files.writeFiles([{ path: '/workspace/request.json', mode: 0o600, owner: 'node', group: 'node', data: JSON.stringify({
         prompt: run.prompt, model: run.manifest.profile.model, endpoint: run.manifest.profile.endpoint,
         deadline_at: run.manifest.deadline_at, attempt_id: run.attempt_id,
+        output_contract: run.manifest.output_contract, input_path: run.manifest.grant.inputs[0]?.path,
+        format: run.manifest.grant.inputs[0]?.format,
       }) }]);
       const token = this.secrets(run.manifest.profile.secret_ref);
       if (!token) throw new TaskError('authorization_required');
@@ -39,13 +57,20 @@ export class OpenSandboxAdapter implements SandboxPort {
       if (execution.error || execution.exitCode !== 0) throw new TaskError('runtime_failed');
       const info = await sandbox.files.getFileInfo(['/workspace/result.json']);
       const size = info['/workspace/result.json']?.size;
-      if (typeof size !== 'number' || size > 16_384) throw new TaskError('output_invalid');
-      const content = await sandbox.files.readFile('/workspace/result.json');
-      let envelope: { failure?: unknown; candidate?: unknown };
+      const limit = run.manifest.output_contract === 'data-statistics@1' ? Math.ceil(ARTIFACT_LIMIT * 4 / 3) + 32_768 : 16_384;
+      if (info['/workspace/result.json']?.type !== 'file' || typeof size !== 'number' || size > limit) throw new TaskError('output_invalid');
+      const content = await sandbox.files.readFile('/workspace/result.json', { limit: limit + 1 });
+      let envelope: { failure?: unknown; candidate?: unknown; files?: { path: string; base64: string }[]; execution?: unknown };
+      if (Buffer.byteLength(content) > limit) throw new TaskError('output_invalid');
       try { envelope = JSON.parse(content); } catch { throw new TaskError('output_invalid'); }
       if (envelope.failure) {
         const code = envelope.failure;
         throw new TaskError(code === 'input_required' || code === 'authorization_required' || code === 'output_invalid' || code === 'deadline_exceeded' ? code : 'runtime_failed');
+      }
+      if (run.manifest.output_contract === 'data-statistics@1') {
+        if (!Array.isArray(envelope.files) || envelope.files.length !== 2 || envelope.files.some(f => typeof f.base64 !== 'string' || typeof f.path !== 'string')) throw new TaskError('output_invalid');
+        return { candidate: envelope.candidate, execution: envelope.execution,
+          files: envelope.files.map(f => ({ path: f.path, bytes: Buffer.from(f.base64, 'base64') })) };
       }
       return envelope.candidate;
     } finally { await sandbox.close(); }

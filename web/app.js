@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
 const errorText = { authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', config_unavailable: '登记配置不可用。', idempotency_conflict: '该提交身份已绑定其他内容，请刷新后创建新任务。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
-let me = null, selected = null, loading = false, pending = null;
+let me = null, selected = null, loading = false, pending = null, uploaded = null;
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const data = await response.json();
@@ -13,7 +13,7 @@ async function api(path, options = {}) {
 }
 function showError(error) { $('error').textContent = error instanceof Error ? error.message : '连接失败，请重试。'; $('error').hidden = false; }
 function loggedOut() {
-  me = null; selected = null; $('workspace').hidden = true; $('login').hidden = false;
+  me = null; selected = null; uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
   $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('detail').close();
 }
@@ -28,10 +28,25 @@ async function renderDetail(id, open = false) {
   $('detail-id').textContent = id; $('facts').replaceChildren();
   fact('业务状态', statusText[run.status]); fact('阶段', statusText[run.phase]); fact('失败类别', run.failure);
   fact('回收状态', statusText[run.cleanup.status]); fact('最近核验', run.cleanup.observed_at);
-  fact('核验来源', run.cleanup.source); fact('输出校验', run.validation?.status === 'passed' ? '通过 summary-value@1' : run.validation?.status === 'failed' ? '不合格' : '未完成');
+  fact('核验来源', run.cleanup.source); fact('输出校验', run.validation?.status === 'passed' ? `通过 ${run.validation.contract}` : run.validation?.status === 'failed' ? '不合格' : '未完成');
   fact('Attempt', run.attempt_id);
   $('result').textContent = result ? JSON.stringify(result.result, null, 2) : '尚无已提交结果';
-  $('manifest').textContent = JSON.stringify(run.execution, null, 2);
+  $('manifest').textContent = JSON.stringify({ ...run.execution, inputs: run.inputs }, null, 2);
+  $('artifacts').replaceChildren(); $('artifact-error').textContent = '';
+  for (const artifact of result?.artifacts ?? []) {
+    const row = node('p', `${artifact.path} · ${artifact.size_bytes} bytes · ${artifact.availability === 'expired' ? '已过期' : '可下载'} · 保留至 ${new Date(artifact.expires_at).toLocaleString('zh-CN')} `);
+    const button = node('button', `下载 ${artifact.path}`); button.disabled = artifact.availability !== 'available';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const link = await api(`/v1/artifacts/${artifact.artifact_id}/download-link`, { method: 'POST', body: '{}' });
+        const anchor = document.createElement('a'); anchor.href = link.url; anchor.download = artifact.path.split('/').pop(); anchor.rel = 'noreferrer'; anchor.click();
+      } catch (error) { $('artifact-error').textContent = error.message; }
+      finally { button.disabled = false; }
+    });
+    row.append(button); $('artifacts').append(row);
+  }
+  if (!result?.artifacts?.length) $('artifacts').textContent = '尚无已交付文件';
   if (open && !$('detail').open) $('detail').showModal();
 }
 async function refresh() {
@@ -65,7 +80,7 @@ async function connect() {
   me = await api('/v1/me'); $('login').hidden = true; $('workspace').hidden = false; $('logout').hidden = false; $('refresh').hidden = false;
   $('identity').textContent = `${me.workspace} / ${me.actor} · ${me.role}`; $('nav-workspace').textContent = me.workspace;
   $('profile').textContent = me.profile;
-  $('mode').textContent = me.mode === 'fixture' ? '确定性实验模式：任务经过真实 API 与持久化；执行端为固定替身，不调用模型，也不创建 Docker 资源。' : '真实实验模式：使用服务端登记的 OpenSandbox 与模型配置。';
+  $('mode').textContent = me.mode === 'fixture' ? '确定性实验模式：任务经过真实 API 与持久化；执行端为受控替身；文件任务运行本地真实代码，不调用模型，也不创建 Docker 资源。' : '真实实验模式：使用服务端登记的 OpenSandbox 与模型配置。';
   $('submission').hidden = me.role === 'health'; $('run-list').hidden = me.role === 'health';
   const hash = location.hash.slice(1); selected = /^[a-f0-9-]{36}$/.test(hash) ? hash : null;
   await refresh();
@@ -77,12 +92,31 @@ $('login-form').addEventListener('submit', async event => {
 $('submit-form').addEventListener('submit', async event => {
   event.preventDefault(); $('submit').disabled = true;
   try {
-    const request = { prompt: $('prompt').value, profile: me.profile, output_contract: me.output_contract };
+    if ($('input-file').files.length && !uploaded) throw new Error('请先上传并校验输入文件。');
+    const request = { prompt: $('prompt').value, profile: me.profile, output_contract: uploaded ? 'data-statistics@1' : me.output_contract,
+      ...(uploaded ? { inputs: [{ file_id: uploaded.file_id, path: `input/data.${uploaded.format}` }] } : {}) };
     if (!pending || pending.body !== JSON.stringify(request)) pending = { key: crypto.randomUUID(), body: JSON.stringify(request) };
     const run = await api('/v1/runs', { method: 'POST', headers: { 'Idempotency-Key': pending.key }, body: pending.body });
     pending = null; selected = run.run_id; location.hash = run.run_id; await refresh();
   } catch (e) { showError(e); }
   finally { $('submit').disabled = false; }
+});
+$('input-file').addEventListener('change', () => { uploaded = null; pending = null; $('input-status').textContent = '文件待上传校验'; });
+$('clear-input').addEventListener('click', () => { uploaded = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; });
+$('upload-input').addEventListener('click', async () => {
+  const file = $('input-file').files[0]; $('upload-input').disabled = true;
+  try {
+    if (!file || !/\.(csv|json)$/i.test(file.name)) throw new Error('请选择 CSV 或 JSON 文件。');
+    if (file.size > 50 * 1024 * 1024) throw new Error('输入文件超过 50 MiB 上限。');
+    const identity = me;
+    const object = await api('/v1/files', { method: 'POST', headers: { 'X-File-Format': file.name.split('.').pop().toLowerCase(), 'Content-Type': 'application/octet-stream' }, body: file });
+    if (me !== identity || $('input-file').files[0] !== file) return;
+    uploaded = object; pending = null;
+    $('input-status').textContent = `已校验 · ${object.size_bytes} bytes · ${object.file_id} · 保留至 ${new Date(object.expires_at).toLocaleString('zh-CN')}`;
+    $('prompt').value = '按十进制处理输入数据。负数和零有效，非数字行进入拒绝清单；保持输入顺序，输出有效 CSV、拒绝 JSON 和统计。';
+    $('error').hidden = true;
+  } catch (error) { showError(error); }
+  finally { $('upload-input').disabled = false; }
 });
 $('refresh').addEventListener('click', refresh);
 $('logout').addEventListener('click', async () => { try { await api('/auth/logout', { method: 'POST' }); location.hash = ''; loggedOut(); } catch (e) { showError(e); } });

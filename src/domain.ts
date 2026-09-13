@@ -1,3 +1,4 @@
+import type { fileSchema } from './file-contract.js';
 export type Role = 'caller' | 'maintainer' | 'health';
 export interface Identity { token: string; actor: string; workspace: string; role: Role }
 export interface Profile {
@@ -20,20 +21,37 @@ export class ApiError extends Error {
 }
 export interface Run {
   run_id: string; owner: string; workspace: string; request_digest: string; prompt: string;
-  manifest: { profile: Profile; output_contract: 'summary-value@1'; schema: typeof outputSchema;
-    grant: { tools: []; mcp: []; inputs: []; external_access: 'model-only' }; deadline_at: string };
+  manifest: { profile: Profile; output_contract: 'summary-value@1' | 'data-statistics@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema;
+    grant: { tools: string[]; mcp: []; inputs: InputBinding[]; external_access: 'model-only' }; deadline_at: string };
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out';
   phase: 'queued' | 'preparing' | 'executing' | 'terminal'; failure: Failure | null;
   accepted_at: string; terminal_at: string | null; attempt_id: string | null;
   allocation: { operation_id: string; resource_id: string | null } | null;
   cleanup: { status: 'pending' | 'complete' | 'unknown' | 'failed'; observed_at: string | null; source: string | null };
-  validation: { status: 'passed' | 'failed'; contract: 'summary-value@1' } | null;
-  result: { summary: string; value: number } | null;
+  validation: { status: 'passed' | 'failed'; contract: 'summary-value@1' | 'data-statistics@1'; checks?: string[] } | null;
+  result: { summary: string; value: number } | FileResult | null;
+  artifacts?: string[];
 }
 export interface SandboxPort {
   readonly source: string;
   prepare(run: Run): Promise<string>;
+  loadInputs?(run: Run, inputs: LoadedInput[]): Promise<void>;
   execute(run: Run, signal: AbortSignal): Promise<unknown>;
   cleanup(run: Run): Promise<'absent' | 'unknown' | 'present'>;
 }
 export const now = () => new Date().toISOString();
+
+export interface StoredObject {
+  object_id: string; kind: 'input' | 'artifact'; owner: string; workspace: string;
+  run_id: string | null; path: string | null; format: 'csv' | 'json';
+  size_bytes: number; sha256: string; status: 'staged' | 'available' | 'removed';
+  expires_at: string; cleanup_observed_at: string | null;
+}
+export interface InputBinding {
+  file_id: string; path: string; sha256: string; size_bytes: number; format: 'csv' | 'json';
+  owner: string; workspace: string; expires_at: string; loaded: boolean;
+}
+
+export interface FileResult { summary: string; input_count: number; valid_count: number; rejected_count: number; total: string; groups: Record<string, string> }
+export interface LoadedInput { binding: InputBinding; bytes: Buffer }
+export interface FileCandidate { candidate: unknown; files: { path: string; bytes: Buffer }[]; execution: { tool: 'process-data@1'; observed: true } }
