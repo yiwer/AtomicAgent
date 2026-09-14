@@ -1,0 +1,38 @@
+{
+  "base": "https://agent.91boy.cn",
+  "mode": "fixture",
+  "created_at": "2026-09-14T04:06:15.299Z",
+  "file_id": "f7c7f66f-c0ac-4e3e-a67e-1b4b1b13db68",
+  "run_id": "116e2da3-764f-4bd8-906e-a088ffa4ae9c",
+  "session_secure": true,
+  "unauthenticated_status": 401,
+  "foreign_origin_status": 403,
+  "checked_at": "2026-09-14T04:09:06.269Z",
+  "result": {
+    "summary": "Processed 4 rows",
+    "input_count": 4,
+    "valid_count": 3,
+    "rejected_count": 1,
+    "total": "12.6",
+    "groups": {
+      "alpha": "7.3",
+      "beta": "5.3"
+    }
+  },
+  "artifacts": [
+    {
+      "artifact_id": "bc1925ef-82ec-48eb-a288-ad5a6230cd36",
+      "path": "output/valid.csv",
+      "bytes": 56,
+      "sha256": "27bae99577b5b426b2b08525370c0586c529d0b281ebfb36e36e1f0f65a2949b"
+    },
+    {
+      "artifact_id": "39c2d1e7-b2bd-4bf6-8dcc-a44ddbf1c352",
+      "path": "output/rejected.json",
+      "bytes": 48,
+      "sha256": "9ddbc235aed559df2cdf67418535e4ef28b7983d0cc2e7fd046328d97f068168"
+    }
+  ],
+  "cleanup": "complete",
+  "persistence_verified_at": "2026-09-14T04:09:06.270Z"
+}

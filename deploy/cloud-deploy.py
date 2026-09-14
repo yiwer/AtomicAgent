@@ -38,6 +38,15 @@ def check(*args):
     return docker('exec', NAME, 'node', 'deploy/cloud-check.mjs', *args, capture=True)
 
 
+def inspect_container():
+    result = subprocess.run(['docker', 'inspect', NAME], capture_output=True, text=True, timeout=30)
+    if result.returncode == 0:
+        return json.loads(result.stdout)[0]
+    if result.stderr.strip() == f'Error: No such object: {NAME}':
+        return None
+    raise RuntimeError('Container inspection unknown; no state mutation is safe')
+
+
 def ready():
     for _ in range(30):
         try:
@@ -56,8 +65,8 @@ def deploy(revision):
     metadata = json.loads(docker('image', 'inspect', image, capture=True))[0]
     if metadata['Config']['Labels'].get('org.opencontainers.image.revision') != revision:
         raise RuntimeError('Image revision mismatch')
-    old = subprocess.run(['docker', 'inspect', NAME], capture_output=True, text=True)
-    previous = json.loads(old.stdout)[0]['Image'] if old.returncode == 0 else None
+    old = inspect_container()
+    previous = old['Image'] if old else None
     snapshot = ROOT / 'backups' / f'{time.time_ns()}-{revision}'
     previously_gated = GATE.exists()
     GATE.touch(mode=0o644)
@@ -87,8 +96,8 @@ def deploy(revision):
         (ROOT / 'revision').write_text(revision + '\n')
     except Exception:
         if stopped:
-            current = subprocess.run(['docker', 'inspect', NAME], capture_output=True)
-            if current.returncode == 0:
+            current = inspect_container()
+            if current is not None:
                 docker('stop', '--time', '45', NAME)
                 docker('rm', NAME)
             if backed_up:

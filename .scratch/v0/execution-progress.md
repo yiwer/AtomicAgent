@@ -16,6 +16,8 @@
 
 ## 当前票状态
 
+2026-09-14 人工停点的部署补充：按用户新授权，将正常 main/API/SQLite 的 fixture 实例部署至 `159.75.158.26`、`https://agent.91boy.cn`，并配置 main 测试通过后 GitHub CI 自动发布。首轮 Actions `34804178451`、HTTPS 文件／产物、真实失败回滚与原数据持久性、云端浏览器检查通过；详情见 [部署账本](evidence/cloud-deployment/verification.md)。这只补齐云端体验入口，不关闭各票真实模型／gVisor／生产容量／用户人工验收，也不启动 Ticket12。
+
 “待推进”表示尚未由本轮 agent 核对或实现；“实现可用”也不表示整票验收通过。具体结果以对应票和证据为准。
 
 | 票 | 本轮 agent | 实现／核对 | 提交 | 最终验收 |

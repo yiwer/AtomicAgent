@@ -1,6 +1,8 @@
 # Ticket11 后的人工 smoke 与体验验收
 
-状态：人工入口已启动，等待用户体验。按用户 2026-09-14 指令，完成 Ticket11 后停止自动推进，不启动 Ticket12；下列人工结果当前全部未执行。
+状态：云端人工入口已部署，等待用户体验。按用户 2026-09-14 指令，完成 Ticket11 后停止自动推进，不启动 Ticket12；下列人工结果当前全部未执行。
+
+2026-09-14 云端入口更新：使用 **[https://agent.91boy.cn](https://agent.91boy.cn)**，工作区 `cloud-smoke`，环境 `json-default@1`。从私有文件 `.local/cloud-deploy/config.json` 复制 `identities[0].token` 登录。云端已完成 HTTPS／文件与产物／回滚持久性／浏览器的工程检查，仍为明确的 fixture，不调用真实模型，不创建任务 Docker 沙箱；[部署与 CI 说明](../../docs/cloud-deployment.md)。下面保留的 4312 地址、令牌位置与 Run ID 是原本机预检记录，不能用于云端登录。
 
 运行代码：`9162199`。入口：[http://127.0.0.1:4312](http://127.0.0.1:4312)。使用正常 `main`、真实 API 与 SQLite，独立保存本轮 smoke 数据。本机已有 4310 服务，本轮使用独立端口和数据库。
 

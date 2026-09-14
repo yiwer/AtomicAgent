@@ -26,4 +26,10 @@ CI 构建以完整 Git SHA 标记的镜像，通过专用 SSH 密钥流式传输
 
 以实际 Actions run、HTTPS 鉴权、文件任务与重启持久性记录作为工程部署证据；CI 绿色或首页 200 本身不表示真实模型或人工体验通过。人工步骤沿用 [Ticket11 smoke](../.scratch/v0/manual-smoke-after-ticket11.md)，将入口改为云端地址并使用云端令牌。
 
-部署与验证结果在执行后补充。
+首轮 [Actions 34804178451](https://github.com/yiwer/AtomicAgent/actions/runs/34804178451) 已通过并发布 `16824bc`，实际容器镜像 `sha256:9825c8a56832ef2dd31359cbbb5f1854f8eddaf40893f54e054369dd00c55e84`。HTTPS 会话、文件任务／产物下载、桌面／手机浏览器及坏候选版本的真实回滚均通过。回滚后的原 Run 与产物摘要不变；原有五个容器保持健康。详细 [验证账本](../.scratch/v0/evidence/cloud-deployment/verification.md)。后续 main 提交的实际发布版本见 Actions 与服务器 `/var/lib/atomicagent/revision`。
+
+本机保留一份私有云端配置 `.local/cloud-deploy/config.json`，可复制 `identities[0].token` 登录。它与本机 4312 的令牌不同。服务器令牌读取命令（仅在本人终端执行，不把输出提交或贴入日志）：
+
+```powershell
+ssh -i "$env:USERPROFILE/.ssh/te_cloud.pem" ubuntu@159.75.158.26 'sudo python3 -c "import json; print(json.load(open(\"/etc/atomicagent/config.json\"))[\"identities\"][0][\"token\"])"'
+```
