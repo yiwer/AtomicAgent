@@ -97,9 +97,13 @@ curl --fail --cacert /tmp/atomicagent-ticket10-server/model.crt https://172-17-0
 
 ```bash
 docker rm -f "$server_id" "$model_id"
-for resource_id in "$server_id" "$model_id"; do
-  if docker inspect "$resource_id"; then echo 'owned resource still present'; exit 1; fi
-done
+python3 - "$server_id" "$model_id" <<'PY'
+import subprocess, sys
+for resource_id in sys.argv[1:]:
+    observed = subprocess.run(['docker', 'inspect', resource_id], capture_output=True, text=True)
+    assert observed.returncode != 0 and 'no such object' in observed.stderr.lower(), resource_id + ': absence not established'
+    print('absent', resource_id)
+PY
 docker network inspect "$network_id" --format '{{json .Containers}}' # 应为空
 docker network rm "$network_id"
 test "$(realpath /tmp/atomicagent-ticket10-server)" = /tmp/atomicagent-ticket10-server
