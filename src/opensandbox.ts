@@ -167,7 +167,9 @@ export class OpenSandboxAdapter implements SandboxPort {
   async requestStop(run: Run) {
     if (!run.allocation?.resource_id || !run.attempt_id) return;
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation.resource_id, connectionConfig: { ...this.config(run), requestTimeoutSeconds: 5 }, readyTimeoutSeconds: 5 });
-    try { await sandbox.files.writeFiles([{ path: '/run/atomicagent-cancel.json', mode: 400, owner: 'root', group: 'root',
+    // Existing in-flight legacy images retain their original marker and reader; this grants no new execution.
+    const isolated=this.qualifiedImages.includes(run.manifest.profile.image),owner=isolated?'root':'node';
+    try { await sandbox.files.writeFiles([{ path: isolated?'/run/atomicagent-cancel.json':'/workspace/cancel.json', mode: 400, owner, group: owner,
       data: JSON.stringify({ run_id: run.run_id, attempt_id: run.attempt_id }) }]); }
     finally { await sandbox.close(); }
   }
