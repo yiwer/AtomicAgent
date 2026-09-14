@@ -45,8 +45,6 @@ jobs:
           node-version: 24.18.0
           cache: npm
       - run: npm ci && npm run build
-      - name: Build immutable app image
-        run: docker build -f deploy/Dockerfile.app --build-arg REVISION="$GITHUB_SHA" -t "atomicagent-app:$GITHUB_SHA" .
       - name: Install deployment SSH identity
         env:
           DEPLOY_KEY: ${{ secrets.ATOMIC_DEPLOY_SSH_KEY }}
@@ -63,5 +61,14 @@ jobs:
             echo 'A newer main commit exists; skip this superseded deployment.'
             exit 0
           fi
-          docker save "atomicagent-app:$GITHUB_SHA" | gzip -1 | ssh -i ~/.ssh/atomicagent -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 atomicagent-deploy@159.75.158.26 "deploy $GITHUB_SHA"
+          remote=(ssh -i ~/.ssh/atomicagent -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 atomicagent-deploy@159.75.158.26)
+          "${remote[@]}" base > "$RUNNER_TEMP/atomicagent-base.json"
+          if node deploy/match-dependency-base.mjs "$RUNNER_TEMP/atomicagent-base.json"; then
+            echo 'Dependencies unchanged: transfer tested application bundle.'
+            tar -czf - package.json package-lock.json dist/src dist/scripts web deploy/cloud-check.mjs deploy/Dockerfile.app | "${remote[@]}" "release $GITHUB_SHA"
+          else
+            echo 'Dependencies changed: build and transfer full pinned image.'
+            docker build -f deploy/Dockerfile.app --build-arg REVISION="$GITHUB_SHA" --label "atomicagent.dependency-recipe=$(sha256sum deploy/Dockerfile.app | cut -d ' ' -f1)" -t "atomicagent-app:$GITHUB_SHA" .
+            docker save "atomicagent-app:$GITHUB_SHA" | gzip -1 | "${remote[@]}" "deploy $GITHUB_SHA"
+          fi
           curl --fail --retry 3 --retry-delay 2 https://agent.91boy.cn/ -o /dev/null

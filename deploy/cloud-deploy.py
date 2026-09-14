@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Single-node fixture deployment. Installed root-owned, never replaced by CI."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -8,12 +9,98 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
 import time
 
 ROOT = Path('/var/lib/atomicagent')
 DATA = ROOT / 'data'
 GATE = Path('/etc/nginx/atomicagent-maintenance')
 NAME = 'atomicagent-app'
+BASE = ROOT / 'dependency-base.json'
+
+
+def read_release(stream, directory):
+    """Extract only regular app files, never archive paths/links outside this build context."""
+    total = 0
+    seen = set()
+    with tarfile.open(fileobj=stream, mode='r|gz') as archive:
+        for member in archive:
+            name = member.name.rstrip('/')
+            parts = Path(name).parts
+            if not parts or any(p in ('.', '..') for p in parts) or Path(name).is_absolute():
+                raise RuntimeError('Unsafe release path')
+            allowed = name in ('package.json', 'package-lock.json', 'deploy/cloud-check.mjs', 'deploy/Dockerfile.app') or name.startswith(('dist/src/', 'dist/scripts/', 'web/'))
+            if member.isdir() and name in ('dist/src', 'dist/scripts', 'web', 'deploy'):
+                continue
+            if member.isdir() and allowed:
+                continue
+            if not member.isfile() or not allowed or name in seen:
+                raise RuntimeError('Unexpected release member')
+            seen.add(name)
+            if len(seen) > 1024:
+                raise RuntimeError('Too many release files')
+            total += member.size
+            if member.size < 0 or total > 5 * 1024 * 1024:
+                raise RuntimeError('Release exceeds 5 MiB limit')
+            target = directory / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.extractfile(member) as source, target.open('xb') as output:
+                shutil.copyfileobj(source, output)
+            target.chmod(0o644)
+    for path in directory.rglob('*'):
+        if path.is_dir():
+            path.chmod(0o755)
+    if not {'package.json', 'package-lock.json', 'dist/src/main.js', 'web/index.html', 'deploy/cloud-check.mjs', 'deploy/Dockerfile.app'} <= seen:
+        raise RuntimeError('Incomplete release')
+
+
+def package_hashes(directory):
+    return {name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
+            for name in ('package.json', 'package-lock.json')}
+
+
+def build_release(revision, stream):
+    base = json.loads(BASE.read_text())
+    if not re.fullmatch('sha256:[a-f0-9]{64}', base['image']):
+        raise RuntimeError('Invalid dependency base')
+    with tempfile.TemporaryDirectory(prefix='release-', dir=ROOT) as temporary:
+        directory = Path(temporary)
+        read_release(stream, directory)
+        if package_hashes(directory) != base['packages'] or hashlib.sha256((directory / 'deploy/Dockerfile.app').read_bytes()).hexdigest() != base['recipe']:
+            raise RuntimeError('Dependency base mismatch; a full image is required')
+        # The administrator owns this recipe. CI may not upload a Dockerfile or host script.
+        (directory / 'Dockerfile').write_text('''ARG BASE
+FROM ${BASE}
+USER root
+RUN rm -rf /opt/atomicagent/dist /opt/atomicagent/web /opt/atomicagent/deploy
+WORKDIR /opt/atomicagent
+COPY package.json package-lock.json ./
+COPY dist/src ./dist/src
+COPY dist/scripts ./dist/scripts
+COPY web ./web
+COPY deploy/cloud-check.mjs ./deploy/cloud-check.mjs
+ARG REVISION
+LABEL org.opencontainers.image.revision=$REVISION
+USER node
+CMD ["node", "dist/src/main.js"]
+''')
+        docker('build', '--network=none', '--build-arg', f'BASE={base["image"]}',
+               '--build-arg', f'REVISION={revision}', '-t', f'atomicagent-app:{revision}', str(directory))
+
+
+def remember_dependency_base(approved_recipe=None):
+    observed = inspect_container()
+    if observed is None:
+        raise RuntimeError('No running dependency base')
+    script = "const fs=require('node:fs'),c=require('node:crypto');console.log(JSON.stringify(Object.fromEntries(['package.json','package-lock.json'].map(n=>[n,c.createHash('sha256').update(fs.readFileSync(n)).digest('hex')]))))"
+    packages = json.loads(docker('exec', NAME, 'node', '-e', script, capture=True))
+    recipe = approved_recipe or json.loads(docker('image', 'inspect', observed['Image'], capture=True))[0]['Config']['Labels'].get('atomicagent.dependency-recipe')
+    if not isinstance(recipe, str) or not re.fullmatch('[a-f0-9]{64}', recipe):
+        raise RuntimeError('Dependency recipe provenance missing')
+    temporary = BASE.with_suffix('.tmp')
+    temporary.write_text(json.dumps({'image': observed['Image'], 'packages': packages, 'recipe': recipe}))
+    temporary.replace(BASE)
 
 
 def docker(*args, capture=False):
@@ -57,11 +144,13 @@ def ready():
     raise RuntimeError('Application readiness failed')
 
 
-def deploy(revision):
+def deploy(revision, mode='deploy'):
     image = f'atomicagent-app:{revision}'
-    # Docker accepts gzip on stdin. No source files or shell commands are uploaded.
-    subprocess.run(['docker', 'load'], stdin=sys.stdin.buffer, stdout=subprocess.DEVNULL,
-                   check=True, timeout=1200)
+    if mode == 'release':
+        build_release(revision, sys.stdin.buffer)
+    else:
+        subprocess.run(['docker', 'load'], stdin=sys.stdin.buffer, stdout=subprocess.DEVNULL,
+                       check=True, timeout=1200)
     metadata = json.loads(docker('image', 'inspect', image, capture=True))[0]
     if metadata['Config']['Labels'].get('org.opencontainers.image.revision') != revision:
         raise RuntimeError('Image revision mismatch')
@@ -119,14 +208,26 @@ def deploy(revision):
     if snapshot.exists():
         raise RuntimeError('Snapshot deletion unconfirmed')
     GATE.unlink(missing_ok=True)
+    if mode == 'deploy':
+        try:
+            remember_dependency_base()
+        except Exception:
+            print('Release healthy; dependency cache was not updated.', file=sys.stderr)
     print(f'Deployed {revision}')
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2 or not re.fullmatch('[a-f0-9]{40}', sys.argv[1]):
+    if sys.argv[1:] == ['--base']:
+        print(BASE.read_text() if BASE.exists() else '{}')
+        sys.exit(0)
+    if len(sys.argv) == 3 and sys.argv[1] == '--remember-base' and re.fullmatch('[a-f0-9]{64}', sys.argv[2]):
+        check('--idle')
+        remember_dependency_base(sys.argv[2])
+        sys.exit(0)
+    if len(sys.argv) not in (2, 3) or not re.fullmatch('[a-f0-9]{40}', sys.argv[1]) or (len(sys.argv) == 3 and sys.argv[2] not in ('deploy', 'release')):
         sys.exit('Expected an exact commit SHA')
     os.umask(0o077)
     ROOT.mkdir(exist_ok=True)
     with open('/run/lock/atomicagent-deploy.lock', 'w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        deploy(sys.argv[1])
+        deploy(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else 'deploy')
