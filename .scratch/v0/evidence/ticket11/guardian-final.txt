@@ -1,0 +1,6 @@
+{"observed_at": "2026-09-14T03:21:12.844546+00:00", "recorded_resources": 30, "resources_absent": 30, "volumes": 11, "volumes_absent": 11, "runs": 16, "crash_run": [{"directory": "crash", "run_id": "ef2e69d8-55ce-4ce3-8af1-2b3ec24a3782", "attempt_id": "fc897d46-06f3-453e-ae3f-5b49c19c3118", "status": "timed_out", "failure": "deadline_exceeded", "deadline_at": "2026-09-14T03:13:29.828Z", "accepted_at": "2026-09-14T03:12:59.828Z", "terminal_at": "2026-09-14T03:14:44.721Z", "allocation": {"operation_id": "1262306c-774b-4623-8508-0f51dac56cb1", "resource_id": "9e7f4e2f-978e-47f4-9fe6-b88172cce8e5", "creation_pending": false}, "audit_counts": {"attempt.start-intent": 1, "boundary.action-admit": 1, "boundary.call": 2, "boundary.observed": 1, "execution.force-stop-intent": 1, "execution.stop-observed": 1, "grant.freeze": 1, "limits.execution-observed": 1, "limits.terminate": 1, "run.accept": 2, "run.fail": 1, "run.read": 61, "sandbox.cleanup-observed": 2, "sandbox.create-intent": 1, "sandbox.create-receipt": 1, "sandbox.prepared": 1}, "submission_outcomes": [{"action": "run.accept", "outcome": "accepted", "count": 1}, {"action": "run.accept", "outcome": "replayed", "count": 1}]}]}
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.134s
+
+OK

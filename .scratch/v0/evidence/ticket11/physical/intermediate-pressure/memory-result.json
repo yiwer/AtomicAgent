@@ -1,0 +1,132 @@
+{
+  "run_id": "9b8e7f12-5874-4db2-a714-595a02fe907c",
+  "status": "failed",
+  "phase": "terminal",
+  "failure": "budget_exceeded",
+  "resource_limits": {
+    "source": "opensandbox:cgroup-v2-observation",
+    "observed_at": "2026-09-14T03:08:07.100Z",
+    "cpu_quota": 25000,
+    "cpu_period": 100000,
+    "memory_bytes": 402653184,
+    "workspace_bytes": 190840832,
+    "deadline_at": "2026-09-14T03:08:41.502Z",
+    "memory_events": {
+      "max": 1285,
+      "oom": 13,
+      "oom_kill": 2
+    }
+  },
+  "limit_termination": {
+    "dimension": "memory_mib",
+    "source": "platform:fixed-execution-limits",
+    "observed_at": "2026-09-14T03:08:09.855Z"
+  },
+  "accepted_at": "2026-09-14T03:07:41.502Z",
+  "terminal_at": "2026-09-14T03:08:09.855Z",
+  "attempt_id": "d466f294-2c47-4f41-9523-9413be4324e7",
+  "submission_digest": "d2d4fed289bac89935ee182d276237ac976341d72511609d9949824325ae1f76",
+  "boundary": {
+    "run_id": "9b8e7f12-5874-4db2-a714-595a02fe907c",
+    "attempt_id": "d466f294-2c47-4f41-9523-9413be4324e7",
+    "source": "controlled-runner:namespace-and-gateway",
+    "observed_at": "2026-09-14T03:08:07.302Z",
+    "isolation": "enforced",
+    "audit_coverage": "partial",
+    "calls": [
+      {
+        "invocation_id": "7a0930c0-7647-49d4-8979-64346e74c372",
+        "boundary": "transport",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T03:07:52.300Z"
+      },
+      {
+        "invocation_id": "aaa20406-dfe2-420b-a7fc-cd4c3ffbdbed",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T03:07:53.996Z"
+      },
+      {
+        "invocation_id": "aaa20406-dfe2-420b-a7fc-cd4c3ffbdbed",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T03:07:54.323Z"
+      },
+      {
+        "invocation_id": "aaa20406-dfe2-420b-a7fc-cd4c3ffbdbed",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T03:07:54.356Z"
+      },
+      {
+        "invocation_id": "aaa20406-dfe2-420b-a7fc-cd4c3ffbdbed",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T03:08:07.003Z"
+      },
+      {
+        "invocation_id": "aaa20406-dfe2-420b-a7fc-cd4c3ffbdbed",
+        "boundary": "model",
+        "outcome": "unknown",
+        "observed_at": "2026-09-14T03:08:07.302Z"
+      }
+    ],
+    "call_results": [
+      {
+        "invocation_id": "7a0930c0-7647-49d4-8979-64346e74c372",
+        "boundary": "transport",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T03:07:52.300Z"
+      },
+      {
+        "invocation_id": "aaa20406-dfe2-420b-a7fc-cd4c3ffbdbed",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T03:08:07.003Z"
+      }
+    ]
+  },
+  "cleanup": {
+    "status": "complete",
+    "observed_at": "2026-09-14T03:08:10.264Z",
+    "source": "opensandbox"
+  },
+  "cancellation": null,
+  "stop": {
+    "status": "stopped",
+    "forced_at": "2026-09-14T03:08:09.858Z",
+    "observed_at": "2026-09-14T03:08:10.245Z",
+    "source": "opensandbox",
+    "checks": 1,
+    "retry_at": null
+  },
+  "validation": null,
+  "skills": [],
+  "mcp": [],
+  "inputs": [],
+  "execution": {
+    "limits": {
+      "concurrency": 2,
+      "total_timeout_seconds": 60,
+      "input_bytes": 52428800,
+      "artifact_bytes": 104857600,
+      "cpu": 0.25,
+      "memory_mib": 384,
+      "policy_revision": 1,
+      "workspace_bytes": 190840832,
+      "pids": 128
+    },
+    "mcp": [],
+    "skills": [],
+    "manifest_digest": "4f7083f196880004057a1bac0467aa769f468e45f745a80aa7680c444232a5e7",
+    "profile": "provider-limits@1",
+    "mode": "opensandbox",
+    "model": "controlled-model",
+    "sdk": "0.3.270",
+    "cli": "bundled-with-sdk-0.3.270",
+    "node": "24.18.0",
+    "image": "sha256:9643a6d21c0ca1820dc13f547e40b7799d3fc2eadf1ae9b528dd7e84c091db99",
+    "deadline_at": "2026-09-14T03:08:41.502Z",
+    "output_contract": "summary-value@1"
+  }
+}

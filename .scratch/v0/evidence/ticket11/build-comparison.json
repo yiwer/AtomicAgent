@@ -1,0 +1,218 @@
+[
+  {
+    "file": "action-permit.js",
+    "local": "d23a24180a00a3c7dc82c4b87d05fc9a5aba231f05bdf73d80e1859e2e63f33b",
+    "image": "d23a24180a00a3c7dc82c4b87d05fc9a5aba231f05bdf73d80e1859e2e63f33b",
+    "equal": true
+  },
+  {
+    "file": "app.js",
+    "local": "aa2a28641a17b969aa7dbfa2109ed2751cd6f6bf631bddb31518772487437257",
+    "image": "aa2a28641a17b969aa7dbfa2109ed2751cd6f6bf631bddb31518772487437257",
+    "equal": true
+  },
+  {
+    "file": "blob-store.js",
+    "local": "0aea8f209bdedf5db7ad1ff87cf182c05cecea68d5ba3858ec9504e69356b2cd",
+    "image": "0aea8f209bdedf5db7ad1ff87cf182c05cecea68d5ba3858ec9504e69356b2cd",
+    "equal": true
+  },
+  {
+    "file": "bounded-file.js",
+    "local": "b85cee819904d91cfc3c52a5dc12b5963ff3a367e4a819c1249140e11636b0b5",
+    "image": "b85cee819904d91cfc3c52a5dc12b5963ff3a367e4a819c1249140e11636b0b5",
+    "equal": true
+  },
+  {
+    "file": "cancellation.js",
+    "local": "c7ede09242477518f3a47b5c3279bb09401989373f8ffceded1f12c31b4e128d",
+    "image": "c7ede09242477518f3a47b5c3279bb09401989373f8ffceded1f12c31b4e128d",
+    "equal": true
+  },
+  {
+    "file": "claude-execution.js",
+    "local": "978739a5a5cfd5c5548c40f22e68b58f717659a8068536d98a41103d8d18a66f",
+    "image": "978739a5a5cfd5c5548c40f22e68b58f717659a8068536d98a41103d8d18a66f",
+    "equal": true
+  },
+  {
+    "file": "configurations.js",
+    "local": "58d7094d5688532a3b743466f306b05d43496b146e92c44baeb6a4075071ae0d",
+    "image": "58d7094d5688532a3b743466f306b05d43496b146e92c44baeb6a4075071ae0d",
+    "equal": true
+  },
+  {
+    "file": "domain.js",
+    "local": "385b04e4aaad7f31a6e70e11b18b5a9dc769925c33496d3ff1de3ed422e699ee",
+    "image": "385b04e4aaad7f31a6e70e11b18b5a9dc769925c33496d3ff1de3ed422e699ee",
+    "equal": true
+  },
+  {
+    "file": "events.js",
+    "local": "e9e68edabb99cff4bc69941f496d6ff113fa0bac7021b1e9d7ea314b1e37abec",
+    "image": "e9e68edabb99cff4bc69941f496d6ff113fa0bac7021b1e9d7ea314b1e37abec",
+    "equal": true
+  },
+  {
+    "file": "execution-boundary.js",
+    "local": "eecbecd9cee25b22bb32766c7f8afc87dcd0962811d1d0da77c0864df3b8b258",
+    "image": "eecbecd9cee25b22bb32766c7f8afc87dcd0962811d1d0da77c0864df3b8b258",
+    "equal": true
+  },
+  {
+    "file": "file-contract.js",
+    "local": "b7328037a5c47ab48a1bb0d744a5466cfcc66edf517a8b802c6da2990038399b",
+    "image": "b7328037a5c47ab48a1bb0d744a5466cfcc66edf517a8b802c6da2990038399b",
+    "equal": true
+  },
+  {
+    "file": "file-validator.js",
+    "local": "acb75ef59851096364a4298086c4571b25884de59585329d600a2ecb572b4c62",
+    "image": "acb75ef59851096364a4298086c4571b25884de59585329d600a2ecb572b4c62",
+    "equal": true
+  },
+  {
+    "file": "files.js",
+    "local": "a726c0fbd3e47a31fb9b616c2262079d3dcbcde6380b33edb961e5a005effe16",
+    "image": "a726c0fbd3e47a31fb9b616c2262079d3dcbcde6380b33edb961e5a005effe16",
+    "equal": true
+  },
+  {
+    "file": "fixture-sandbox.js",
+    "local": "1f031aa3582c0d2d5336d68ca997ebea0f07af2bd5ab1875c9fc80004c44c1b4",
+    "image": "1f031aa3582c0d2d5336d68ca997ebea0f07af2bd5ab1875c9fc80004c44c1b4",
+    "equal": true
+  },
+  {
+    "file": "guardian.js",
+    "local": "47e02c64e7759acfed41c59ec2f116cdb782d2238b97fbe2f0a03b68971722dd",
+    "image": "47e02c64e7759acfed41c59ec2f116cdb782d2238b97fbe2f0a03b68971722dd",
+    "equal": true
+  },
+  {
+    "file": "isolated-query.js",
+    "local": "cad210e7c3f0f30e8651e99cae9dd0c165cb7f6ce6c15edaef5559cda470704f",
+    "image": "cad210e7c3f0f30e8651e99cae9dd0c165cb7f6ce6c15edaef5559cda470704f",
+    "equal": true
+  },
+  {
+    "file": "isolation-bridge.js",
+    "local": "2957b32438676a5e7dcfa574480d8a1834143fee67b61e9e723c353971cc3e96",
+    "image": "2957b32438676a5e7dcfa574480d8a1834143fee67b61e9e723c353971cc3e96",
+    "equal": true
+  },
+  {
+    "file": "isolation-probe.js",
+    "local": "86a03d4183363592d30ea958fff623de08e658850d704f1eb670986cb2c4f6a1",
+    "image": "86a03d4183363592d30ea958fff623de08e658850d704f1eb670986cb2c4f6a1",
+    "equal": true
+  },
+  {
+    "file": "limits.js",
+    "local": "d123d6fc3df8710a951dd55947f401adcefa1aa56844f9c55681fcbe4a1b0dda",
+    "image": "d123d6fc3df8710a951dd55947f401adcefa1aa56844f9c55681fcbe4a1b0dda",
+    "equal": true
+  },
+  {
+    "file": "main.js",
+    "local": "a870ca5380a53786e65a6b7c1dc2d27cc3785a7f0e125a4cd3a420426d322f51",
+    "image": "a870ca5380a53786e65a6b7c1dc2d27cc3785a7f0e125a4cd3a420426d322f51",
+    "equal": true
+  },
+  {
+    "file": "model-gateway.js",
+    "local": "371e7c378da19aa9cad06333ab92e9ca6f3ef194413a57c7826a088dd226700e",
+    "image": "371e7c378da19aa9cad06333ab92e9ca6f3ef194413a57c7826a088dd226700e",
+    "equal": true
+  },
+  {
+    "file": "opensandbox.js",
+    "local": "698e8449f5ee6aefb2cf683fddf8014ad1ccbf043c6b68b5cb4340e5eae4a878",
+    "image": "698e8449f5ee6aefb2cf683fddf8014ad1ccbf043c6b68b5cb4340e5eae4a878",
+    "equal": true
+  },
+  {
+    "file": "process-data.js",
+    "local": "e7d49e165857d1c5a4352c93b0a7b7027c6d6c71f970876469a111aeec5c9315",
+    "image": "e7d49e165857d1c5a4352c93b0a7b7027c6d6c71f970876469a111aeec5c9315",
+    "equal": true
+  },
+  {
+    "file": "profile-routing.js",
+    "local": "fafbac45ea3a0b341bbdaed53b67244fcd796ab171cc83399f8b36009c333a0f",
+    "image": "fafbac45ea3a0b341bbdaed53b67244fcd796ab171cc83399f8b36009c333a0f",
+    "equal": true
+  },
+  {
+    "file": "profile.js",
+    "local": "e4a6e4cd84795525db0e56782a096948ba847fbfc0f320c3c2769658aa9b248a",
+    "image": "e4a6e4cd84795525db0e56782a096948ba847fbfc0f320c3c2769658aa9b248a",
+    "equal": true
+  },
+  {
+    "file": "research-execution.js",
+    "local": "2ba8ebaedb5c54a046744399fc0af2f5c49331d80c50458979c080d91d23a3d6",
+    "image": "2ba8ebaedb5c54a046744399fc0af2f5c49331d80c50458979c080d91d23a3d6",
+    "equal": true
+  },
+  {
+    "file": "research-snapshots.js",
+    "local": "f105281381e96e313980ae02418a8b19779de309f2ca3d8adb0c7727e07a798f",
+    "image": "f105281381e96e313980ae02418a8b19779de309f2ca3d8adb0c7727e07a798f",
+    "equal": true
+  },
+  {
+    "file": "research.js",
+    "local": "3dc2aeb0509812b28522c59b86d9d21795866fac40038e8e843895bde184339d",
+    "image": "3dc2aeb0509812b28522c59b86d9d21795866fac40038e8e843895bde184339d",
+    "equal": true
+  },
+  {
+    "file": "resource-limits.js",
+    "local": "6440263702d28c9b1d8d2997de37c443484020b17287ed10bad38d3c7a21c573",
+    "image": "6440263702d28c9b1d8d2997de37c443484020b17287ed10bad38d3c7a21c573",
+    "equal": true
+  },
+  {
+    "file": "runner.js",
+    "local": "dad056982bed00407c8014258f6dab5c9b4ad35414fe45ad71162c1777ad7b03",
+    "image": "dad056982bed00407c8014258f6dab5c9b4ad35414fe45ad71162c1777ad7b03",
+    "equal": true
+  },
+  {
+    "file": "sandbox-files.js",
+    "local": "06554bb3d2558e415f707d861cf4bfac3b21539194b6a64dfa837f0bd4a3ac75",
+    "image": "06554bb3d2558e415f707d861cf4bfac3b21539194b6a64dfa837f0bd4a3ac75",
+    "equal": true
+  },
+  {
+    "file": "sandbox-supervisor.js",
+    "local": "c9b2bf22b8f40ad7928b58add37c8976e02dd7964d7b88f417fa4222766fbf21",
+    "image": "c9b2bf22b8f40ad7928b58add37c8976e02dd7964d7b88f417fa4222766fbf21",
+    "equal": true
+  },
+  {
+    "file": "skills.js",
+    "local": "5955c380457dd575b0bc445c675d2f63555468cf8d693215d2c9545d7d80aa5e",
+    "image": "5955c380457dd575b0bc445c675d2f63555468cf8d693215d2c9545d7d80aa5e",
+    "equal": true
+  },
+  {
+    "file": "store.js",
+    "local": "c93d5e74f05e15425312428f47540cf198f968902b1a714d3e88e9f3ebe2b8a6",
+    "image": "c93d5e74f05e15425312428f47540cf198f968902b1a714d3e88e9f3ebe2b8a6",
+    "equal": true
+  },
+  {
+    "file": "submission.js",
+    "local": "a738ae718bf3657b39311b8a16545859c12f8f7e7f31175a6ebab486c4da26d2",
+    "image": "a738ae718bf3657b39311b8a16545859c12f8f7e7f31175a6ebab486c4da26d2",
+    "equal": true
+  },
+  {
+    "file": "worker.js",
+    "local": "758da24e48437935fc8cc22f43c1a5315c8bb1cf6c1a5fd64d09ea5895e6407e",
+    "image": "758da24e48437935fc8cc22f43c1a5315c8bb1cf6c1a5fd64d09ea5895e6407e",
+    "equal": true
+  }
+]

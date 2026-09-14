@@ -34,3 +34,6 @@
 ## Comments
 
 - 2026-09-14：根据用户“接受”发布；尚未开始产品实现或验收。
+- 2026-09-14：本票完整实施，checkpoint f94d336、独立修复9162199，固定审查起点052a144；两个fresh只读Standards/Spec审查所报P1/P2全部复核关闭，未amend。最终139/139测试、19/19浏览器、构建及Linux guardian3/3通过；默认入口独立json-default@1为3600秒，旧清单不改写。
+- 2026-09-14：真实固定SDK/CLI＋patched OpenSandbox＋Docker完成最终五Run：默认cgroup2CPU/4GiB、产物1byte预算终止、15秒绝对期限、0.25CPU/384MiB压力的节流／tmpfs ENOSPC／cgroup三项增量归因内存预算，以及API/worker/provider全失效后的独立guardian到期删除和同Run/Attempt恢复。30登记资源／11卷最终明确不存在，自有临时服务网络／证书清理，原五服务healthy。失败原始资料单列，不覆盖成PASS。
+- 2026-09-14：实现、API及最短启动／人工体验路径见 [说明](../../../docs/implementation/ticket11.md)、[验证账本](../evidence/ticket11/verification.md)、[审查](../evidence/ticket11/review.md)、[失败历史](../evidence/ticket11/failure-history.md)。本机自动审批拒绝删除的临时归档／缓存保留未跟踪，不提交。用户要求在本票后停下人工smoke和实际体验，尚未反馈；不开始12，不勾人工AC。真实模型授权、模型语义、gVisor及2×4GiB生产容量未验收。

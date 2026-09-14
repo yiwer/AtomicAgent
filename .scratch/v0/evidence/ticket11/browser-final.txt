@@ -1,0 +1,40 @@
+
+> atomicagent@0.0.1 test:browser
+> playwright test
+
+[WebServer] (node:9664) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:30144) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:23972) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:23972) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 19 tests using 1 worker
+
+(node:20080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 tests\artifact-reuse.spec.ts:2:1 › A explicitly reuses an Artifact in a new Run, recovers a failed selection and refreshes source/copy details (7.3s)
+  ok  2 tests\cancellation.spec.ts:2:1 › A cancels through the authorized API, refreshes durable adjudication, and shows independent actual stop and cleanup (31.1s)
+  ok  3 tests\configurations.spec.ts:3:1 › A previews a configuration change, recovers its lost publication receipt, and submits the selected fixed revisions (4.0s)
+  ok  4 tests\configurations.spec.ts:39:1 › selected revision modes determine the pre-submit warning and incompatible combinations cannot submit (488ms)
+  ok  5 tests\configurations.spec.ts:67:1 › another browser tab rotating the session cannot apply a preview under a different identity (726ms)
+  ok  6 tests\configurations.spec.ts:87:1 › editing a non-first approved image restores that image timeout limit and publishes a valid follow-up revision (748ms)
+  ok  7 tests\console.spec.ts:2:1 › real browser logs in, submits, refreshes persistent details and recovers from network failure (4.1s)
+  ok  8 tests\console.spec.ts:30:1 › A uploads a real CSV, shows a persistent file Result and downloads after cleanup (3.6s)
+  ok  9 tests\events.spec.ts:3:1 › A resumes the same Run after closing its page and shows the durable Result independently of SSE text (2.7s)
+  ok 10 tests\events.spec.ts:24:1 › A recovers from network loss, deduplicates replay and treats done or EOF only as transport signals (3.8s)
+  ok 11 tests\events.spec.ts:50:1 › A reports an expired cursor and queries the authoritative Run (3.3s)
+  ok 12 tests\execution-boundary.spec.ts:2:1 › A displays the same durable denied policy, partial coverage and unknown isolation on desktop and mobile (3.7s)
+  ok 13 tests\idempotency.spec.ts:3:1 › A recovers an accepted submission after response loss and page refresh without creating another task (2.8s)
+  ok 14 tests\idempotency.spec.ts:38:1 › A retains the unresolved request for its server identity across logout without resubmitting it for another identity (924ms)
+  ok 15 tests\idempotency.spec.ts:70:1 › a real authorization denial on recovery preserves the unresolved key until access returns (652ms)
+  ok 16 tests\idempotency.spec.ts:102:1 › another tab changing the shared session cannot submit an unresolved request under that identity (825ms)
+  ok 17 tests\limits.spec.ts:2:1 › maintainer reviews limits, recovers a lost publish response and verifies the frozen limits after refresh (1.0s)
+  ok 18 tests\research.spec.ts:2:1 › A publishes and probes readonly MCP, recovers refresh, delivers research report and rejects unauthorized management (4.5s)
+  ok 19 tests\skills.spec.ts:3:1 › A publishes a fixed Skill, recovers a lost receipt after refresh, and exposes separate file-task evidence (4.3s)
+
+  19 passed (1.4m)

@@ -1,0 +1,49 @@
+{
+  "run_id": "bb12a94a-807a-4580-9af5-ff06c6d4a33f",
+  "status": "queued",
+  "phase": "queued",
+  "failure": null,
+  "resource_limits": null,
+  "limit_termination": null,
+  "accepted_at": "2026-09-14T02:38:30.816Z",
+  "terminal_at": null,
+  "attempt_id": null,
+  "submission_digest": "adcc274600eb50177e755938307209231f6292a2f9735622bebdd095647a0a62",
+  "boundary": null,
+  "cleanup": {
+    "status": "pending",
+    "observed_at": null,
+    "source": null
+  },
+  "cancellation": null,
+  "stop": null,
+  "validation": null,
+  "skills": [],
+  "mcp": [],
+  "inputs": [],
+  "execution": {
+    "limits": {
+      "concurrency": 2,
+      "total_timeout_seconds": 120,
+      "input_bytes": 52428800,
+      "artifact_bytes": 104857600,
+      "cpu": 2,
+      "memory_mib": 4096,
+      "policy_revision": 1,
+      "workspace_bytes": 190840832,
+      "pids": 128
+    },
+    "mcp": [],
+    "skills": [],
+    "manifest_digest": "b94446f1419f6065cf6e222b0466a8b99681336c2b251a8fbd3d9a73b98cac36",
+    "profile": "provider-limits@1",
+    "mode": "opensandbox",
+    "model": "controlled-model",
+    "sdk": "0.3.270",
+    "cli": "bundled-with-sdk-0.3.270",
+    "node": "24.18.0",
+    "image": "sha256:ae8f854c49aa401123e8f282aa7914aa1a4ee1bed185d15b1b04917c4b452677",
+    "deadline_at": "2026-09-14T02:40:30.816Z",
+    "output_contract": "summary-value@1"
+  }
+}

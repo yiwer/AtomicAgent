@@ -166,3 +166,11 @@ SSE 重连可以重复收到事件，调用方按序号去重。游标已过保�
 | `GET /internal/cleanup-obligations` | 查询未完成、逾期或核验未知的资源责任，与业务终态分离 |
 
 异常确认/抑制、重试回收等写操作通过受控运维命令执行，使用独立授权和命令身份并记录审计；不能提供任意宿主命令入口。读取监控、读取审计、读取业务结果和强制处置是不同权限。这里的运维回收不扩大 Agent 对外部业务系统的只读边界。
+
+## 9. Ticket11 已实现的限额接口
+
+实现和实测边界见 [Ticket11](implementation/ticket11.md)，不代替人工AC。`GET /v1/limits` 返回工作区current/history、登记ranges、global_capacity=2及hard_money=unsupported；caller/maintainer可读，health身份拒绝。`POST /v1/limits/preview` 和 `POST /v1/limits/commands` 仅maintainer可用；body为expected_revision、全部六项values、reason，执行时另带preview_digest及原Idempotency-Key。版本／预览冲突409、非法字段或登记范围400、硬金额422。相同命令恢复原回执；同key改body409；修订、回执和audit同事务，失败不推进修订。
+
+默认values为concurrency2、total_timeout_seconds3600、input_bytes52428800、artifact_bytes104857600、cpu2、memory_mib4096。范围分别为1–2整数、1–3600整数、1–52428800整数、1–104857600整数、0.25–2步长0.25、128–4096整数。新Run的limits仅可收紧后五项，不能改concurrency；所有值写入清单，timeout仍与冻结环境timeout取较小值。新默认登记json-default@1为3600秒，历史json-lab@1的60秒不改写。
+
+Run查询的execution.limits是冻结值，resource_limits是带来源／时间的执行观测，limit_termination给出维度和触发来源；stop与cleanup独立。CPU为节流、RAM／tmpfs为执行层上限，产物采样和最终交付检查不是无超调逐byte写盘配额。budget_exceeded与deadline_exceeded有明确维度；缺实际资源边界resource_limits_unavailable。`GET /internal/health`分开返回持久限额占用投影和独立guardian观测，后者不连接、失败或过期均unknown。硬金额请求返回hard_money_limit_unsupported，不声明预警等价强制。

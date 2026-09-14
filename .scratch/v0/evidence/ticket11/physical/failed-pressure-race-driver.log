@@ -1,0 +1,22 @@
+{"prepared":{"run_id":"f5777c8b-e323-48da-b20f-05bb5e6f4250","operation_id":"2cf2b211-b5dc-41ea-99f1-305a2b68f777","resource_id":"accf5aad-76fb-4a5b-8b17-69ece5c6c1e9","deadline_at":"2026-09-14T03:06:02.724Z","limits":{"concurrency":2,"total_timeout_seconds":60,"input_bytes":52428800,"artifact_bytes":104857600,"cpu":0.25,"memory_mib":384,"policy_revision":1,"workspace_bytes":190840832,"pids":128}}}
+{"key":"memory","run":{"run_id":"f5777c8b-e323-48da-b20f-05bb5e6f4250","status":"failed","phase":"terminal","failure":"runtime_failed","resource_limits":null,"limit_termination":null,"accepted_at":"2026-09-14T03:05:02.724Z","terminal_at":"2026-09-14T03:05:05.396Z","attempt_id":"8d3e58d0-8059-48b0-90c5-66a7ec8feb70","submission_digest":"d2d4fed289bac89935ee182d276237ac976341d72511609d9949824325ae1f76","boundary":null,"cleanup":{"status":"complete","observed_at":"2026-09-14T03:05:05.762Z","source":"opensandbox"},"cancellation":null,"stop":null,"validation":null,"skills":[],"mcp":[],"inputs":[],"execution":{"limits":{"concurrency":2,"total_timeout_seconds":60,"input_bytes":52428800,"artifact_bytes":104857600,"cpu":0.25,"memory_mib":384,"policy_revision":1,"workspace_bytes":190840832,"pids":128},"mcp":[],"skills":[],"manifest_digest":"461cbff8b647016953d20fc3b3e15388f93a3a38145b66270f4be0a00d5bedfa","profile":"provider-limits@1","mode":"opensandbox","model":"controlled-model","sdk":"0.3.270","cli":"bundled-with-sdk-0.3.270","node":"24.18.0","image":"sha256:041bd4c0defc5705e635a5e05ca871bcf445377a843b9fd418fcceacaa0198eb","deadline_at":"2026-09-14T03:06:02.724Z","output_contract":"summary-value@1"}}}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'runtime_failed'
+- 'budget_exceeded'
+
+    at file:///opt/atomicagent/dist/scripts/verify-provider-limits.js:42:20 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'runtime_failed',
+  expected: 'budget_exceeded',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.18.0

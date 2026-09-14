@@ -1,0 +1,67 @@
+{
+  "run_id": "0cd6f5f4-d950-4702-83bb-191fed6d220f",
+  "status": "queued",
+  "phase": "queued",
+  "failure": null,
+  "resource_limits": null,
+  "limit_termination": null,
+  "accepted_at": "2026-09-14T02:55:22.366Z",
+  "terminal_at": null,
+  "attempt_id": null,
+  "submission_digest": "17d0ba6086f328f1dd6e023abe6a6f37a0e676beaee002716264f3baf41909ee",
+  "boundary": null,
+  "cleanup": {
+    "status": "pending",
+    "observed_at": null,
+    "source": null
+  },
+  "cancellation": null,
+  "stop": null,
+  "validation": null,
+  "skills": [],
+  "mcp": [],
+  "inputs": [
+    {
+      "file_id": "33702701-f39c-42fa-bc0d-c6a1e885b83f",
+      "path": "input/data.csv",
+      "sha256": "666af40675b0e15c3761bed32586eeca4a4d166cbbbbe6abd6b3cba4a5ecd48d",
+      "size_bytes": 24,
+      "loaded": false,
+      "binding_id": "7abc2b36-ebfa-4ab3-8d8a-980cfde6f5e8",
+      "copy": {
+        "run_id": "0cd6f5f4-d950-4702-83bb-191fed6d220f",
+        "path": "input/data.csv",
+        "loaded_at": null,
+        "status": "unconfirmed",
+        "cleanup_status": "pending",
+        "observed_at": null,
+        "source": null
+      }
+    }
+  ],
+  "execution": {
+    "limits": {
+      "concurrency": 2,
+      "total_timeout_seconds": 60,
+      "input_bytes": 52428800,
+      "artifact_bytes": 1,
+      "cpu": 0.25,
+      "memory_mib": 384,
+      "policy_revision": 1,
+      "workspace_bytes": 85983233,
+      "pids": 128
+    },
+    "mcp": [],
+    "skills": [],
+    "manifest_digest": "56ff46b0188c54df102f5560714be3707961903eb3f833c98b0f929dce871ba7",
+    "profile": "provider-limits@1",
+    "mode": "opensandbox",
+    "model": "controlled-model",
+    "sdk": "0.3.270",
+    "cli": "bundled-with-sdk-0.3.270",
+    "node": "24.18.0",
+    "image": "sha256:49ac2b200919f9f5893fda45e5ceba4aeaf8a059be687f29512eb27a879f5b13",
+    "deadline_at": "2026-09-14T02:56:22.366Z",
+    "output_contract": "data-statistics@1"
+  }
+}

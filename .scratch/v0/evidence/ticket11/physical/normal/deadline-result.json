@@ -1,0 +1,114 @@
+{
+  "run_id": "17e546e7-fce9-474f-b5ab-77b5a40eb307",
+  "status": "timed_out",
+  "phase": "terminal",
+  "failure": "deadline_exceeded",
+  "resource_limits": {
+    "source": "trusted-supervisor:cgroup-v2-and-tmpfs",
+    "observed_at": "2026-09-14T03:16:59.860Z",
+    "cpu_quota": 25000,
+    "cpu_period": 100000,
+    "memory_bytes": 402653184,
+    "workspace_bytes": 190840832,
+    "deadline_at": "2026-09-14T03:17:12.768Z",
+    "memory_events": {
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0
+    }
+  },
+  "limit_termination": {
+    "dimension": "total_timeout_seconds",
+    "source": "platform:fixed-execution-limits",
+    "observed_at": "2026-09-14T03:17:12.769Z"
+  },
+  "accepted_at": "2026-09-14T03:16:57.768Z",
+  "terminal_at": "2026-09-14T03:17:12.769Z",
+  "attempt_id": "d1ed3b79-93f1-4b9a-ba81-478591487012",
+  "submission_digest": "e41cfef8a54975155c19ef183bb3d21b7877e42cee326b54576e3d59c0491b26",
+  "boundary": {
+    "run_id": "17e546e7-fce9-474f-b5ab-77b5a40eb307",
+    "attempt_id": "d1ed3b79-93f1-4b9a-ba81-478591487012",
+    "source": "controlled-runner:namespace-and-gateway",
+    "observed_at": "2026-09-14T03:17:08.547Z",
+    "isolation": "enforced",
+    "audit_coverage": "partial",
+    "calls": [
+      {
+        "invocation_id": "9e273f40-8257-465b-9e05-3b13c0fe9d6f",
+        "boundary": "transport",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T03:17:07.147Z"
+      },
+      {
+        "invocation_id": "637bb577-4a2d-4927-ae09-0dc136c9555b",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T03:17:08.547Z"
+      },
+      {
+        "invocation_id": "637bb577-4a2d-4927-ae09-0dc136c9555b",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T03:17:08.756Z"
+      }
+    ],
+    "call_results": [
+      {
+        "invocation_id": "9e273f40-8257-465b-9e05-3b13c0fe9d6f",
+        "boundary": "transport",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T03:17:07.147Z"
+      },
+      {
+        "invocation_id": "637bb577-4a2d-4927-ae09-0dc136c9555b",
+        "boundary": "model",
+        "outcome": "unknown",
+        "observed_at": "2026-09-14T03:17:08.756Z"
+      }
+    ]
+  },
+  "cleanup": {
+    "status": "complete",
+    "observed_at": "2026-09-14T03:17:13.182Z",
+    "source": "opensandbox"
+  },
+  "cancellation": null,
+  "stop": {
+    "status": "stopped",
+    "forced_at": "2026-09-14T03:17:12.773Z",
+    "observed_at": "2026-09-14T03:17:13.167Z",
+    "source": "opensandbox",
+    "checks": 1,
+    "retry_at": null
+  },
+  "validation": null,
+  "skills": [],
+  "mcp": [],
+  "inputs": [],
+  "execution": {
+    "limits": {
+      "concurrency": 2,
+      "total_timeout_seconds": 15,
+      "input_bytes": 52428800,
+      "artifact_bytes": 104857600,
+      "cpu": 0.25,
+      "memory_mib": 384,
+      "policy_revision": 1,
+      "workspace_bytes": 190840832,
+      "pids": 128
+    },
+    "mcp": [],
+    "skills": [],
+    "manifest_digest": "9e52b540f142709c6fc5d5ff8b11ba76aa8d5eec8a2b35a8e43a2ad3bc51a577",
+    "profile": "provider-limits@1",
+    "mode": "opensandbox",
+    "model": "controlled-model",
+    "sdk": "0.3.270",
+    "cli": "bundled-with-sdk-0.3.270",
+    "node": "24.18.0",
+    "image": "sha256:ce8d0083a606a9a45b8667e60ccd442681056be1e6c6c0993249d66aa022aac4",
+    "deadline_at": "2026-09-14T03:17:12.768Z",
+    "output_contract": "summary-value@1"
+  }
+}

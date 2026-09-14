@@ -1,0 +1,12 @@
+{"driver_id": "23678c1189156ad6962e1bfebe614eb5efff895e45a51c6e3b3858414221d0d2", "mode": "pressure", "image": "sha256:49ac2b200919f9f5893fda45e5ceba4aeaf8a059be687f29512eb27a879f5b13", "observed_at": "2026-09-14T03:01:06.985818+00:00"}
+{"run_id": "7f559a68-6dc2-45bf-abc0-2b81e0ed4224", "resource_id": "e845e6f111629cae4b25a2953043b0c9d07d93d76fea1b11432755f3781d25a0", "sidecar_id": "244eead5ee32ace34e6d6b47ae0d8eceee4cd18833c8191cbad55d7f7d6f9163", "deadline_at": "2026-09-14T03:02:08.617Z", "cpu_nano": 250000000, "memory_bytes": 402653184, "memory_swap_bytes": 805306368, "ports": {"18080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "43825"}], "44772/tcp": [{"HostIp": "127.0.0.1", "HostPort": "43878"}], "8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "43906"}]}, "observed_at": "2026-09-14T03:01:10.744517+00:00"}
+{"cpu_before": {"usage_usec": "2521104", "user_usec": "1970879", "system_usec": "550225", "core_sched.force_idle_usec": "0", "nr_periods": "110", "nr_throttled": "98", "throttled_usec": "13781633", "nr_bursts": "0", "burst_usec": "0"}, "cpu_after": {"usage_usec": "3578846", "user_usec": "2988793", "system_usec": "590053", "core_sched.force_idle_usec": "0", "nr_periods": "152", "nr_throttled": "140", "throttled_usec": "18076534", "nr_bursts": "0", "burst_usec": "0"}, "work": "{\"cpu_work_completed\":true}", "behavior": "throttled", "observed_at": "2026-09-14T03:01:26.019746+00:00"}
+{"workspace_pressure": {"workspace_quota": "ENOSPC", "written_bytes": 190840832}, "observed_at": "2026-09-14T03:01:26.978938+00:00"}
+{"memory_before": {"low": "0", "high": "0", "max": "0", "oom": "0", "oom_kill": "0", "oom_group_kill": "0"}, "pressure_process_exit": 137, "pressure_process_exit_is_not_oom_proof": true, "observed_at": "2026-09-14T03:01:31.469315+00:00"}
+Traceback (most recent call last):
+  File "/tmp/atomicagent-ticket11-work/observe-limits-experiment.py", line 62, in <module>
+    final_path=root/mode/'memory-result.json';wait(final_path.exists,30);final=json.loads(final_path.read_text())
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/atomicagent-ticket11-work/observe-limits-experiment.py", line 28, in wait
+    raise RuntimeError('bounded_observation_timeout')
+RuntimeError: bounded_observation_timeout

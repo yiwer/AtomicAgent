@@ -1,0 +1,1332 @@
+{
+  "observed_at": "2026-09-14T03:21:12.844546+00:00",
+  "guardian_health": {
+    "source": "independent-guardian:docker-inspection",
+    "observed_at": "2026-09-14T03:21:12.662430+00:00",
+    "queried_at": "2026-09-14T03:21:12.844009+00:00",
+    "status": "available",
+    "freshness": "fresh",
+    "coverage": "registered-immutable-create-intents-only",
+    "intents_retained": 16,
+    "volumes_unresolved": 0,
+    "unknown_intents": 0,
+    "resources_unresolved": 0
+  },
+  "guardian": {
+    "intents": [
+      {
+        "operation": "cb063dff-f041-4d21-8626-42fabae6b8cd",
+        "document": "{\"deadline_at\": \"2026-09-14T02:40:30.816Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:ae8f854c49aa401123e8f282aa7914aa1a4ee1bed185d15b1b04917c4b452677\", \"operation_id\": \"cb063dff-f041-4d21-8626-42fabae6b8cd\", \"run_id\": \"bb12a94a-807a-4580-9af5-ff06c6d4a33f\"}"
+      },
+      {
+        "operation": "201535e6-af14-465b-a09f-8c0c8d2def4e",
+        "document": "{\"deadline_at\": \"2026-09-14T02:42:13.415Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:24348fc25a45c3e89395b0c89ac9c798c2805ba3a487b357571efdf40398f347\", \"operation_id\": \"201535e6-af14-465b-a09f-8c0c8d2def4e\", \"run_id\": \"21125046-0962-44f0-a482-a844f353143b\"}"
+      },
+      {
+        "operation": "17b178f2-8698-4d7f-bd41-44203ca2d562",
+        "document": "{\"deadline_at\": \"2026-09-14T02:43:46.644Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:32a3a2233a3492898f7a4ad0603afcadb6d776d785a7aa4464d72d42e698e3b3\", \"operation_id\": \"17b178f2-8698-4d7f-bd41-44203ca2d562\", \"run_id\": \"2651293a-733d-43cd-950e-bbcd1497794e\"}"
+      },
+      {
+        "operation": "eaaeb56a-3330-4f03-94ee-fa2c69dc2f03",
+        "document": "{\"deadline_at\": \"2026-09-14T02:44:31.637Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:32a3a2233a3492898f7a4ad0603afcadb6d776d785a7aa4464d72d42e698e3b3\", \"operation_id\": \"eaaeb56a-3330-4f03-94ee-fa2c69dc2f03\", \"run_id\": \"0029c81e-fefb-41b7-99dd-8353889ec0e2\"}"
+      },
+      {
+        "operation": "01945cf8-0554-4270-b761-fa1e6499ba06",
+        "document": "{\"deadline_at\": \"2026-09-14T02:43:57.973Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:32a3a2233a3492898f7a4ad0603afcadb6d776d785a7aa4464d72d42e698e3b3\", \"operation_id\": \"01945cf8-0554-4270-b761-fa1e6499ba06\", \"run_id\": \"c20a9270-ec9d-43d0-a84e-f235f142f6c0\"}"
+      },
+      {
+        "operation": "4a30537e-d659-4f3e-93d9-f8f9c7c6c11d",
+        "document": "{\"deadline_at\": \"2026-09-14T02:57:14.541Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:49ac2b200919f9f5893fda45e5ceba4aeaf8a059be687f29512eb27a879f5b13\", \"operation_id\": \"4a30537e-d659-4f3e-93d9-f8f9c7c6c11d\", \"run_id\": \"545aec95-4495-4ddf-8010-2f4f8b9406be\"}"
+      },
+      {
+        "operation": "e49daef3-f7ca-4afa-83be-c71d95a367fb",
+        "document": "{\"deadline_at\": \"2026-09-14T02:56:22.366Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:49ac2b200919f9f5893fda45e5ceba4aeaf8a059be687f29512eb27a879f5b13\", \"operation_id\": \"e49daef3-f7ca-4afa-83be-c71d95a367fb\", \"run_id\": \"0cd6f5f4-d950-4702-83bb-191fed6d220f\"}"
+      },
+      {
+        "operation": "5d9cb365-257c-4812-ba2b-132ff8bb118b",
+        "document": "{\"deadline_at\": \"2026-09-14T02:55:53.921Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:49ac2b200919f9f5893fda45e5ceba4aeaf8a059be687f29512eb27a879f5b13\", \"operation_id\": \"5d9cb365-257c-4812-ba2b-132ff8bb118b\", \"run_id\": \"74ebd2d0-1bea-4455-9c0b-a8ea542f284d\"}"
+      },
+      {
+        "operation": "40817996-b91d-4749-bcd0-1f85d0cca8f1",
+        "document": "{\"deadline_at\": \"2026-09-14T03:02:08.617Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:49ac2b200919f9f5893fda45e5ceba4aeaf8a059be687f29512eb27a879f5b13\", \"operation_id\": \"40817996-b91d-4749-bcd0-1f85d0cca8f1\", \"run_id\": \"7f559a68-6dc2-45bf-abc0-2b81e0ed4224\"}"
+      },
+      {
+        "operation": "2cf2b211-b5dc-41ea-99f1-305a2b68f777",
+        "document": "{\"deadline_at\": \"2026-09-14T03:06:02.724Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:041bd4c0defc5705e635a5e05ca871bcf445377a843b9fd418fcceacaa0198eb\", \"operation_id\": \"2cf2b211-b5dc-41ea-99f1-305a2b68f777\", \"run_id\": \"f5777c8b-e323-48da-b20f-05bb5e6f4250\"}"
+      },
+      {
+        "operation": "59383514-b020-42f8-b5ad-87c2ffd0b432",
+        "document": "{\"deadline_at\": \"2026-09-14T03:08:41.502Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:9643a6d21c0ca1820dc13f547e40b7799d3fc2eadf1ae9b528dd7e84c091db99\", \"operation_id\": \"59383514-b020-42f8-b5ad-87c2ffd0b432\", \"run_id\": \"9b8e7f12-5874-4db2-a714-595a02fe907c\"}"
+      },
+      {
+        "operation": "1262306c-774b-4623-8508-0f51dac56cb1",
+        "document": "{\"deadline_at\": \"2026-09-14T03:13:29.828Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:ce8d0083a606a9a45b8667e60ccd442681056be1e6c6c0993249d66aa022aac4\", \"operation_id\": \"1262306c-774b-4623-8508-0f51dac56cb1\", \"run_id\": \"ef2e69d8-55ce-4ce3-8af1-2b3ec24a3782\"}"
+      },
+      {
+        "operation": "ea785d91-7474-4d27-b3e8-2b3e8c96c11e",
+        "document": "{\"deadline_at\": \"2026-09-14T03:15:58.124Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:ce8d0083a606a9a45b8667e60ccd442681056be1e6c6c0993249d66aa022aac4\", \"operation_id\": \"ea785d91-7474-4d27-b3e8-2b3e8c96c11e\", \"run_id\": \"aecf992c-d3f0-4be1-8a6b-19b30b33a139\"}"
+      },
+      {
+        "operation": "92497512-4d91-4170-9548-1f15085c165b",
+        "document": "{\"deadline_at\": \"2026-09-14T03:18:32.695Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:ce8d0083a606a9a45b8667e60ccd442681056be1e6c6c0993249d66aa022aac4\", \"operation_id\": \"92497512-4d91-4170-9548-1f15085c165b\", \"run_id\": \"fa366aa4-74d9-40d4-a4ec-44c25cbb06b8\"}"
+      },
+      {
+        "operation": "b5c59491-9cc3-44ca-9bf0-feee31b0d10b",
+        "document": "{\"deadline_at\": \"2026-09-14T03:17:40.481Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:ce8d0083a606a9a45b8667e60ccd442681056be1e6c6c0993249d66aa022aac4\", \"operation_id\": \"b5c59491-9cc3-44ca-9bf0-feee31b0d10b\", \"run_id\": \"fdb385ed-0afa-48a2-a542-b0d69a17bebe\"}"
+      },
+      {
+        "operation": "e8f061a5-2b05-4d00-b633-3bf83e5a4cce",
+        "document": "{\"deadline_at\": \"2026-09-14T03:17:12.768Z\", \"guardian_id\": \"ticket11\", \"image\": \"sha256:ce8d0083a606a9a45b8667e60ccd442681056be1e6c6c0993249d66aa022aac4\", \"operation_id\": \"e8f061a5-2b05-4d00-b633-3bf83e5a4cce\", \"run_id\": \"17e546e7-fce9-474f-b5ab-77b5a40eb307\"}"
+      }
+    ],
+    "resources": [
+      {
+        "id": "dbdd56f2f09e7ad5695dc7befababdec5a0b766f62fec525f35d6519c0975688",
+        "operation": "cb063dff-f041-4d21-8626-42fabae6b8cd",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.422684+00:00"
+      },
+      {
+        "id": "ed05a5dba7e274917cc24029cebc084841d79b4b7005564e06a6aca7095fb73b",
+        "operation": "cb063dff-f041-4d21-8626-42fabae6b8cd",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.423836+00:00"
+      },
+      {
+        "id": "00759018a3ca4f19fb9148609411561f43d8f607b1b1323a67fe025ceb06888a",
+        "operation": "201535e6-af14-465b-a09f-8c0c8d2def4e",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.426227+00:00"
+      },
+      {
+        "id": "17bdd979807590e6767186f1ec5f56848058e8b34027c5bb5526c21d3a3ef743",
+        "operation": "201535e6-af14-465b-a09f-8c0c8d2def4e",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.427219+00:00"
+      },
+      {
+        "id": "f8bcdbb69d1162e5733fc5f511c074437ef5b1e816f349eb06e3b090ce5269b4",
+        "operation": "17b178f2-8698-4d7f-bd41-44203ca2d562",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.430147+00:00"
+      },
+      {
+        "id": "10bf255ab0ea3b6eb132a9b35b232ee3077f26754be6eef744e15b757f42a303",
+        "operation": "17b178f2-8698-4d7f-bd41-44203ca2d562",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.430934+00:00"
+      },
+      {
+        "id": "61029c7ae4982c4e06a03ea0b51593f4beefec041be285f351949a3ff7379faf",
+        "operation": "eaaeb56a-3330-4f03-94ee-fa2c69dc2f03",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.433124+00:00"
+      },
+      {
+        "id": "3aa631793be6d0f0c8f076d77379caac18aab49923a841417bc289080563d749",
+        "operation": "eaaeb56a-3330-4f03-94ee-fa2c69dc2f03",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.434043+00:00"
+      },
+      {
+        "id": "1e0875dad532b95b0290195694443326ba84a10c39e15091d9f1baa8ad9f0e6e",
+        "operation": "4a30537e-d659-4f3e-93d9-f8f9c7c6c11d",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.437676+00:00"
+      },
+      {
+        "id": "93f62928cb1fcfd53aa64384f44ae0d8d2474c094958d05c500a698b13db484f",
+        "operation": "4a30537e-d659-4f3e-93d9-f8f9c7c6c11d",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.438430+00:00"
+      },
+      {
+        "id": "6d1f8c6b96199f87b084e5d724d75ad1d7a297d26ce1bbd121a17518b9d8faff",
+        "operation": "e49daef3-f7ca-4afa-83be-c71d95a367fb",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.440369+00:00"
+      },
+      {
+        "id": "c6c0c295796c774107c0605a8242c4ab24b6f0668d9c762adce88af706884577",
+        "operation": "e49daef3-f7ca-4afa-83be-c71d95a367fb",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.441304+00:00"
+      },
+      {
+        "id": "e34e749c4d46cc3f2d478105cb48af5950a971746cce920dd4dc5083e3e656df",
+        "operation": "5d9cb365-257c-4812-ba2b-132ff8bb118b",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.443219+00:00"
+      },
+      {
+        "id": "e8a353e350f05049cfdee4fc925081f8be0b7a4d115b16fd38ca1bb62931116c",
+        "operation": "5d9cb365-257c-4812-ba2b-132ff8bb118b",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.444002+00:00"
+      },
+      {
+        "id": "244eead5ee32ace34e6d6b47ae0d8eceee4cd18833c8191cbad55d7f7d6f9163",
+        "operation": "40817996-b91d-4749-bcd0-1f85d0cca8f1",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.445763+00:00"
+      },
+      {
+        "id": "e845e6f111629cae4b25a2953043b0c9d07d93d76fea1b11432755f3781d25a0",
+        "operation": "40817996-b91d-4749-bcd0-1f85d0cca8f1",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.446557+00:00"
+      },
+      {
+        "id": "07d913d1366dc02a19e102ac6f5ef9a207ba8a1dfd1bd625b3ece40f37a1bb64",
+        "operation": "2cf2b211-b5dc-41ea-99f1-305a2b68f777",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.448954+00:00"
+      },
+      {
+        "id": "b781914de99cda27e457af9b8fe9e2577b4eef58b1687f91e5d67690162d0fe2",
+        "operation": "2cf2b211-b5dc-41ea-99f1-305a2b68f777",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.449735+00:00"
+      },
+      {
+        "id": "626869688c018034502a7ba773940b46595bf030e5919bc38897090a20ff7aef",
+        "operation": "59383514-b020-42f8-b5ad-87c2ffd0b432",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.451567+00:00"
+      },
+      {
+        "id": "b2000961267eca28d63ad5992c37c06df32821d26cfb313839ca86f719c29e00",
+        "operation": "59383514-b020-42f8-b5ad-87c2ffd0b432",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.452374+00:00"
+      },
+      {
+        "id": "63f22e5c5242df3ada840e3fb80f4ec4e68a1d3b20a86f7bdbff05e94e7b1e38",
+        "operation": "1262306c-774b-4623-8508-0f51dac56cb1",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.454366+00:00"
+      },
+      {
+        "id": "19e25242d0ab42d59caf9041c6f53231b3bcf75773dcccb545409f4b47b67e24",
+        "operation": "1262306c-774b-4623-8508-0f51dac56cb1",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.455150+00:00"
+      },
+      {
+        "id": "bd8378bf021abc4e74d4da0dc3c671df531fd36332ddac35dc0a23e9ffa8b73f",
+        "operation": "ea785d91-7474-4d27-b3e8-2b3e8c96c11e",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.456869+00:00"
+      },
+      {
+        "id": "ca775206421efe95415e36f40a7a8e15a28e21e4521dbad7f9665549680fe779",
+        "operation": "ea785d91-7474-4d27-b3e8-2b3e8c96c11e",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.457627+00:00"
+      },
+      {
+        "id": "b72d476622432b6b28d01880004d44dcebdbb13a64fd58363a579bd0912ce680",
+        "operation": "92497512-4d91-4170-9548-1f15085c165b",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.459712+00:00"
+      },
+      {
+        "id": "1973f79649e8988f21ea8d7b77057da9533dbe48d2ead780dd2f9e734b3201de",
+        "operation": "92497512-4d91-4170-9548-1f15085c165b",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.460749+00:00"
+      },
+      {
+        "id": "85b8c67b78d4ae5f1d7b7291d342a378ed5ddec2f65b12057f3a097e24d03727",
+        "operation": "b5c59491-9cc3-44ca-9bf0-feee31b0d10b",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.462496+00:00"
+      },
+      {
+        "id": "ea098ae50d247e5b2d7fed72599811e7b3952308a33626c7db0adcb571e65f31",
+        "operation": "b5c59491-9cc3-44ca-9bf0-feee31b0d10b",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.463434+00:00"
+      },
+      {
+        "id": "d59a06c3c89ebeecf9fdd2a582364b091600d3ed512fd52841fe959ce5a7807e",
+        "operation": "e8f061a5-2b05-4d00-b633-3bf83e5a4cce",
+        "kind": "sidecar",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.465297+00:00"
+      },
+      {
+        "id": "5358de15c9dffc1181abc544380bad625552ee597026ec08b83bb8440654e783",
+        "operation": "e8f061a5-2b05-4d00-b633-3bf83e5a4cce",
+        "kind": "sandbox",
+        "status": "absent",
+        "observed_at": "2026-09-14T03:21:11.466051+00:00"
+      }
+    ],
+    "volumes": [
+      {
+        "name": "opensandbox-runtime-8ca82281-e9b9-49ed-8fa1-2976e5611798",
+        "operation": "4a30537e-d659-4f3e-93d9-f8f9c7c6c11d",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T10:55:15+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-8ca82281-e9b9-49ed-8fa1-2976e5611798/_data\", \"Name\": \"opensandbox-runtime-8ca82281-e9b9-49ed-8fa1-2976e5611798\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-888287d8-60cf-4659-a312-1b813ac47096",
+        "operation": "e49daef3-f7ca-4afa-83be-c71d95a367fb",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T10:55:22+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-888287d8-60cf-4659-a312-1b813ac47096/_data\", \"Name\": \"opensandbox-runtime-888287d8-60cf-4659-a312-1b813ac47096\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-db12c89b-3a9b-4969-85cc-7fc9a9834c0f",
+        "operation": "5d9cb365-257c-4812-ba2b-132ff8bb118b",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T10:55:38+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-db12c89b-3a9b-4969-85cc-7fc9a9834c0f/_data\", \"Name\": \"opensandbox-runtime-db12c89b-3a9b-4969-85cc-7fc9a9834c0f\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-52e1e192-127c-42d8-b29b-66aa532ee189",
+        "operation": "40817996-b91d-4749-bcd0-1f85d0cca8f1",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:01:09+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-52e1e192-127c-42d8-b29b-66aa532ee189/_data\", \"Name\": \"opensandbox-runtime-52e1e192-127c-42d8-b29b-66aa532ee189\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-accf5aad-76fb-4a5b-8b17-69ece5c6c1e9",
+        "operation": "2cf2b211-b5dc-41ea-99f1-305a2b68f777",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:05:03+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-accf5aad-76fb-4a5b-8b17-69ece5c6c1e9/_data\", \"Name\": \"opensandbox-runtime-accf5aad-76fb-4a5b-8b17-69ece5c6c1e9\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-9a06714d-612e-4dbe-9578-3916e0ae26aa",
+        "operation": "59383514-b020-42f8-b5ad-87c2ffd0b432",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:07:41+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-9a06714d-612e-4dbe-9578-3916e0ae26aa/_data\", \"Name\": \"opensandbox-runtime-9a06714d-612e-4dbe-9578-3916e0ae26aa\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-9e7f4e2f-978e-47f4-9fe6-b88172cce8e5",
+        "operation": "1262306c-774b-4623-8508-0f51dac56cb1",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:13:00+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-9e7f4e2f-978e-47f4-9fe6-b88172cce8e5/_data\", \"Name\": \"opensandbox-runtime-9e7f4e2f-978e-47f4-9fe6-b88172cce8e5\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-dc0d86b4-dbb5-4be6-95e8-8f7b0b5d5e16",
+        "operation": "ea785d91-7474-4d27-b3e8-2b3e8c96c11e",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:14:58+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-dc0d86b4-dbb5-4be6-95e8-8f7b0b5d5e16/_data\", \"Name\": \"opensandbox-runtime-dc0d86b4-dbb5-4be6-95e8-8f7b0b5d5e16\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-c5399095-ae97-466a-89f7-f3b982c48431",
+        "operation": "92497512-4d91-4170-9548-1f15085c165b",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:16:33+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-c5399095-ae97-466a-89f7-f3b982c48431/_data\", \"Name\": \"opensandbox-runtime-c5399095-ae97-466a-89f7-f3b982c48431\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-39cafd91-34b7-4a9f-a5e7-b118b5cb8708",
+        "operation": "b5c59491-9cc3-44ca-9bf0-feee31b0d10b",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:16:40+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-39cafd91-34b7-4a9f-a5e7-b118b5cb8708/_data\", \"Name\": \"opensandbox-runtime-39cafd91-34b7-4a9f-a5e7-b118b5cb8708\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      },
+      {
+        "name": "opensandbox-runtime-4d9dfc8f-0574-4074-b5e4-ee517f5ee589",
+        "operation": "e8f061a5-2b05-4d00-b633-3bf83e5a4cce",
+        "fingerprint": "{\"CreatedAt\": \"2026-09-14T11:16:57+08:00\", \"Driver\": \"local\", \"Labels\": {\"opensandbox.io/volume-managed-by\": \"server\"}, \"Mountpoint\": \"/var/lib/docker/volumes/opensandbox-runtime-4d9dfc8f-0574-4074-b5e4-ee517f5ee589/_data\", \"Name\": \"opensandbox-runtime-4d9dfc8f-0574-4074-b5e4-ee517f5ee589\", \"Options\": null, \"Scope\": \"local\"}",
+        "status": "absent"
+      }
+    ],
+    "observations": [
+      {
+        "operation": "cb063dff-f041-4d21-8626-42fabae6b8cd",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.424274+00:00"
+      },
+      {
+        "operation": "201535e6-af14-465b-a09f-8c0c8d2def4e",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.428052+00:00"
+      },
+      {
+        "operation": "17b178f2-8698-4d7f-bd41-44203ca2d562",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.431418+00:00"
+      },
+      {
+        "operation": "eaaeb56a-3330-4f03-94ee-fa2c69dc2f03",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.434969+00:00"
+      },
+      {
+        "operation": "01945cf8-0554-4270-b761-fa1e6499ba06",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.436155+00:00"
+      },
+      {
+        "operation": "4a30537e-d659-4f3e-93d9-f8f9c7c6c11d",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.438826+00:00"
+      },
+      {
+        "operation": "e49daef3-f7ca-4afa-83be-c71d95a367fb",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.441689+00:00"
+      },
+      {
+        "operation": "5d9cb365-257c-4812-ba2b-132ff8bb118b",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.444350+00:00"
+      },
+      {
+        "operation": "40817996-b91d-4749-bcd0-1f85d0cca8f1",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.446939+00:00"
+      },
+      {
+        "operation": "2cf2b211-b5dc-41ea-99f1-305a2b68f777",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.450093+00:00"
+      },
+      {
+        "operation": "59383514-b020-42f8-b5ad-87c2ffd0b432",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.452735+00:00"
+      },
+      {
+        "operation": "1262306c-774b-4623-8508-0f51dac56cb1",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.455488+00:00"
+      },
+      {
+        "operation": "ea785d91-7474-4d27-b3e8-2b3e8c96c11e",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.458027+00:00"
+      },
+      {
+        "operation": "92497512-4d91-4170-9548-1f15085c165b",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.461076+00:00"
+      },
+      {
+        "operation": "b5c59491-9cc3-44ca-9bf0-feee31b0d10b",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.463853+00:00"
+      },
+      {
+        "operation": "e8f061a5-2b05-4d00-b633-3bf83e5a4cce",
+        "status": "observed",
+        "observed_at": "2026-09-14T03:21:11.466404+00:00"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "resource_id": "00759018a3ca4f19fb9148609411561f43d8f607b1b1323a67fe025ceb06888a",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.616638+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "07d913d1366dc02a19e102ac6f5ef9a207ba8a1dfd1bd625b3ece40f37a1bb64",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.652530+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "10bf255ab0ea3b6eb132a9b35b232ee3077f26754be6eef744e15b757f42a303",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.683839+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "17bdd979807590e6767186f1ec5f56848058e8b34027c5bb5526c21d3a3ef743",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.722819+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "1973f79649e8988f21ea8d7b77057da9533dbe48d2ead780dd2f9e734b3201de",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.756088+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "19e25242d0ab42d59caf9041c6f53231b3bcf75773dcccb545409f4b47b67e24",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.788126+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "1e0875dad532b95b0290195694443326ba84a10c39e15091d9f1baa8ad9f0e6e",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.819843+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "244eead5ee32ace34e6d6b47ae0d8eceee4cd18833c8191cbad55d7f7d6f9163",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.851518+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "3aa631793be6d0f0c8f076d77379caac18aab49923a841417bc289080563d749",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.882816+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "5358de15c9dffc1181abc544380bad625552ee597026ec08b83bb8440654e783",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.919006+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "61029c7ae4982c4e06a03ea0b51593f4beefec041be285f351949a3ff7379faf",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.950723+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "626869688c018034502a7ba773940b46595bf030e5919bc38897090a20ff7aef",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:11.982252+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "63f22e5c5242df3ada840e3fb80f4ec4e68a1d3b20a86f7bdbff05e94e7b1e38",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.014744+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "6d1f8c6b96199f87b084e5d724d75ad1d7a297d26ce1bbd121a17518b9d8faff",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.048122+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "85b8c67b78d4ae5f1d7b7291d342a378ed5ddec2f65b12057f3a097e24d03727",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.079677+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "93f62928cb1fcfd53aa64384f44ae0d8d2474c094958d05c500a698b13db484f",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.112887+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "b2000961267eca28d63ad5992c37c06df32821d26cfb313839ca86f719c29e00",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.145108+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "b72d476622432b6b28d01880004d44dcebdbb13a64fd58363a579bd0912ce680",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.183704+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "b781914de99cda27e457af9b8fe9e2577b4eef58b1687f91e5d67690162d0fe2",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.214361+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "bd8378bf021abc4e74d4da0dc3c671df531fd36332ddac35dc0a23e9ffa8b73f",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.246129+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "c6c0c295796c774107c0605a8242c4ab24b6f0668d9c762adce88af706884577",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.277258+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "ca775206421efe95415e36f40a7a8e15a28e21e4521dbad7f9665549680fe779",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.308401+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "d59a06c3c89ebeecf9fdd2a582364b091600d3ed512fd52841fe959ce5a7807e",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.342735+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "dbdd56f2f09e7ad5695dc7befababdec5a0b766f62fec525f35d6519c0975688",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.378174+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "e34e749c4d46cc3f2d478105cb48af5950a971746cce920dd4dc5083e3e656df",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.414379+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "e845e6f111629cae4b25a2953043b0c9d07d93d76fea1b11432755f3781d25a0",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.444734+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "e8a353e350f05049cfdee4fc925081f8be0b7a4d115b16fd38ca1bb62931116c",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.476026+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "ea098ae50d247e5b2d7fed72599811e7b3952308a33626c7db0adcb571e65f31",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.507155+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "ed05a5dba7e274917cc24029cebc084841d79b4b7005564e06a6aca7095fb73b",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.538685+00:00",
+      "status": "absent"
+    },
+    {
+      "resource_id": "f8bcdbb69d1162e5733fc5f511c074437ef5b1e816f349eb06e3b090ce5269b4",
+      "source": "independent-host:docker-inspect-full-id",
+      "observed_at": "2026-09-14T03:21:12.570915+00:00",
+      "status": "absent"
+    }
+  ],
+  "volumes": [
+    {
+      "name": "opensandbox-runtime-8ca82281-e9b9-49ed-8fa1-2976e5611798",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.659253+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-888287d8-60cf-4659-a312-1b813ac47096",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.677602+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-db12c89b-3a9b-4969-85cc-7fc9a9834c0f",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.695119+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-52e1e192-127c-42d8-b29b-66aa532ee189",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.713442+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-accf5aad-76fb-4a5b-8b17-69ece5c6c1e9",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.731561+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-9a06714d-612e-4dbe-9578-3916e0ae26aa",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.749857+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-9e7f4e2f-978e-47f4-9fe6-b88172cce8e5",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.768582+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-dc0d86b4-dbb5-4be6-95e8-8f7b0b5d5e16",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.787785+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-c5399095-ae97-466a-89f7-f3b982c48431",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.806150+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-39cafd91-34b7-4a9f-a5e7-b118b5cb8708",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.824520+00:00"
+    },
+    {
+      "name": "opensandbox-runtime-4d9dfc8f-0574-4074-b5e4-ee517f5ee589",
+      "status": "absent",
+      "observed_at": "2026-09-14T03:21:12.843245+00:00"
+    }
+  ],
+  "runs": [
+    {
+      "directory": "crash",
+      "run_id": "ef2e69d8-55ce-4ce3-8af1-2b3ec24a3782",
+      "attempt_id": "fc897d46-06f3-453e-ae3f-5b49c19c3118",
+      "status": "timed_out",
+      "failure": "deadline_exceeded",
+      "deadline_at": "2026-09-14T03:13:29.828Z",
+      "accepted_at": "2026-09-14T03:12:59.828Z",
+      "terminal_at": "2026-09-14T03:14:44.721Z",
+      "allocation": {
+        "operation_id": "1262306c-774b-4623-8508-0f51dac56cb1",
+        "resource_id": "9e7f4e2f-978e-47f4-9fe6-b88172cce8e5",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 2,
+        "boundary.observed": 1,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "limits.execution-observed": 1,
+        "limits.terminate": 1,
+        "run.accept": 2,
+        "run.fail": 1,
+        "run.read": 61,
+        "sandbox.cleanup-observed": 2,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        },
+        {
+          "action": "run.accept",
+          "outcome": "replayed",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "failed-first",
+      "run_id": "bb12a94a-807a-4580-9af5-ff06c6d4a33f",
+      "attempt_id": null,
+      "status": "failed",
+      "failure": "provisioning_failed",
+      "deadline_at": "2026-09-14T02:40:30.816Z",
+      "accepted_at": "2026-09-14T02:38:30.816Z",
+      "terminal_at": "2026-09-14T02:39:04.413Z",
+      "allocation": {
+        "operation_id": "cb063dff-f041-4d21-8626-42fabae6b8cd",
+        "resource_id": null,
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "grant.freeze": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 163,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-returned": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "failed-pressure",
+      "run_id": "7f559a68-6dc2-45bf-abc0-2b81e0ed4224",
+      "attempt_id": "bf672c7a-8d5c-4d66-8983-0597462e88c1",
+      "status": "timed_out",
+      "failure": "deadline_exceeded",
+      "deadline_at": "2026-09-14T03:02:08.617Z",
+      "accepted_at": "2026-09-14T03:01:08.617Z",
+      "terminal_at": "2026-09-14T03:02:08.619Z",
+      "allocation": {
+        "operation_id": "40817996-b91d-4749-bcd0-1f85d0cca8f1",
+        "resource_id": "52e1e192-127c-42d8-b29b-66aa532ee189",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 2,
+        "boundary.observed": 1,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "limits.execution-observed": 1,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 294,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "failed-pressure-race",
+      "run_id": "f5777c8b-e323-48da-b20f-05bb5e6f4250",
+      "attempt_id": "8d3e58d0-8059-48b0-90c5-66a7ec8feb70",
+      "status": "failed",
+      "failure": "runtime_failed",
+      "deadline_at": "2026-09-14T03:06:02.724Z",
+      "accepted_at": "2026-09-14T03:05:02.724Z",
+      "terminal_at": "2026-09-14T03:05:05.396Z",
+      "allocation": {
+        "operation_id": "2cf2b211-b5dc-41ea-99f1-305a2b68f777",
+        "resource_id": "accf5aad-76fb-4a5b-8b17-69ece5c6c1e9",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "grant.freeze": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 14,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "failed-second",
+      "run_id": "21125046-0962-44f0-a482-a844f353143b",
+      "attempt_id": null,
+      "status": "failed",
+      "failure": "provisioning_failed",
+      "deadline_at": "2026-09-14T02:42:13.415Z",
+      "accepted_at": "2026-09-14T02:40:13.415Z",
+      "terminal_at": "2026-09-14T02:40:46.153Z",
+      "allocation": {
+        "operation_id": "201535e6-af14-465b-a09f-8c0c8d2def4e",
+        "resource_id": null,
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "grant.freeze": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 159,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-returned": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "intermediate-normal",
+      "run_id": "2651293a-733d-43cd-950e-bbcd1497794e",
+      "attempt_id": "16689ba4-2525-41e3-8215-22bba855fa79",
+      "status": "succeeded",
+      "failure": null,
+      "deadline_at": "2026-09-14T02:43:46.644Z",
+      "accepted_at": "2026-09-14T02:41:46.644Z",
+      "terminal_at": "2026-09-14T02:43:31.187Z",
+      "allocation": {
+        "operation_id": "17b178f2-8698-4d7f-bd41-44203ca2d562",
+        "resource_id": "d6700b54-6595-488d-8597-a8c7d3f01ba4",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 7,
+        "boundary.call": 22,
+        "boundary.observed": 8,
+        "grant.freeze": 1,
+        "limits.execution-observed": 1,
+        "result.commit": 1,
+        "run.accept": 1,
+        "run.read": 512,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "intermediate-normal",
+      "run_id": "0029c81e-fefb-41b7-99dd-8353889ec0e2",
+      "attempt_id": "f45372d6-a59c-4f6c-ae1b-262a4a755846",
+      "status": "failed",
+      "failure": "budget_exceeded",
+      "deadline_at": "2026-09-14T02:44:31.637Z",
+      "accepted_at": "2026-09-14T02:43:31.637Z",
+      "terminal_at": "2026-09-14T02:43:45.419Z",
+      "allocation": {
+        "operation_id": "eaaeb56a-3330-4f03-94ee-fa2c69dc2f03",
+        "resource_id": "717e3e3a-1956-43a4-ae7c-8fc67fbd2622",
+        "creation_pending": false,
+        "input_copy_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 2,
+        "boundary.call": 6,
+        "boundary.observed": 4,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "input.bind": 1,
+        "input.copy-intent": 1,
+        "input.copy-returned": 1,
+        "input.loaded": 1,
+        "limits.execution-observed": 1,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 70,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "intermediate-normal",
+      "run_id": "c20a9270-ec9d-43d0-a84e-f235f142f6c0",
+      "attempt_id": null,
+      "status": "failed",
+      "failure": "provisioning_failed",
+      "deadline_at": "2026-09-14T02:43:57.973Z",
+      "accepted_at": "2026-09-14T02:43:45.973Z",
+      "terminal_at": "2026-09-14T02:43:45.997Z",
+      "allocation": {
+        "operation_id": "01945cf8-0554-4270-b761-fa1e6499ba06",
+        "resource_id": null,
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "grant.freeze": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 1,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-returned": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "intermediate-normal-success",
+      "run_id": "545aec95-4495-4ddf-8010-2f4f8b9406be",
+      "attempt_id": "7713c4d0-f910-4832-b95a-9d790da5a017",
+      "status": "succeeded",
+      "failure": null,
+      "deadline_at": "2026-09-14T02:57:14.541Z",
+      "accepted_at": "2026-09-14T02:55:14.541Z",
+      "terminal_at": "2026-09-14T02:55:21.820Z",
+      "allocation": {
+        "operation_id": "4a30537e-d659-4f3e-93d9-f8f9c7c6c11d",
+        "resource_id": "8ca82281-e9b9-49ed-8fa1-2976e5611798",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 4,
+        "boundary.observed": 2,
+        "grant.freeze": 1,
+        "limits.execution-observed": 1,
+        "result.commit": 1,
+        "run.accept": 1,
+        "run.read": 37,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "intermediate-normal-success",
+      "run_id": "0cd6f5f4-d950-4702-83bb-191fed6d220f",
+      "attempt_id": "46705d1d-62be-4af1-9e5e-69274ed33836",
+      "status": "failed",
+      "failure": "budget_exceeded",
+      "deadline_at": "2026-09-14T02:56:22.366Z",
+      "accepted_at": "2026-09-14T02:55:22.366Z",
+      "terminal_at": "2026-09-14T02:55:38.302Z",
+      "allocation": {
+        "operation_id": "e49daef3-f7ca-4afa-83be-c71d95a367fb",
+        "resource_id": "888287d8-60cf-4659-a312-1b813ac47096",
+        "creation_pending": false,
+        "input_copy_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 2,
+        "boundary.call": 6,
+        "boundary.observed": 4,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "input.bind": 1,
+        "input.copy-intent": 1,
+        "input.copy-returned": 1,
+        "input.loaded": 1,
+        "limits.execution-observed": 1,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 80,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "intermediate-normal-success",
+      "run_id": "74ebd2d0-1bea-4455-9c0b-a8ea542f284d",
+      "attempt_id": "0bef07a0-0057-4854-a46a-1b09d1b06e52",
+      "status": "timed_out",
+      "failure": "deadline_exceeded",
+      "deadline_at": "2026-09-14T02:55:53.921Z",
+      "accepted_at": "2026-09-14T02:55:38.921Z",
+      "terminal_at": "2026-09-14T02:55:53.922Z",
+      "allocation": {
+        "operation_id": "5d9cb365-257c-4812-ba2b-132ff8bb118b",
+        "resource_id": "db12c89b-3a9b-4969-85cc-7fc9a9834c0f",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 2,
+        "boundary.observed": 1,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "limits.execution-observed": 1,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 75,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "intermediate-pressure",
+      "run_id": "9b8e7f12-5874-4db2-a714-595a02fe907c",
+      "attempt_id": "d466f294-2c47-4f41-9523-9413be4324e7",
+      "status": "failed",
+      "failure": "budget_exceeded",
+      "deadline_at": "2026-09-14T03:08:41.502Z",
+      "accepted_at": "2026-09-14T03:07:41.502Z",
+      "terminal_at": "2026-09-14T03:08:09.855Z",
+      "allocation": {
+        "operation_id": "59383514-b020-42f8-b5ad-87c2ffd0b432",
+        "resource_id": "9a06714d-612e-4dbe-9578-3916e0ae26aa",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 5,
+        "boundary.observed": 2,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "limits.execution-observed": 2,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 139,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "normal",
+      "run_id": "fa366aa4-74d9-40d4-a4ec-44c25cbb06b8",
+      "attempt_id": "a86eccd2-2c36-4eb3-8b97-b9575dde901f",
+      "status": "succeeded",
+      "failure": null,
+      "deadline_at": "2026-09-14T03:18:32.695Z",
+      "accepted_at": "2026-09-14T03:16:32.695Z",
+      "terminal_at": "2026-09-14T03:16:40.022Z",
+      "allocation": {
+        "operation_id": "92497512-4d91-4170-9548-1f15085c165b",
+        "resource_id": "c5399095-ae97-466a-89f7-f3b982c48431",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 4,
+        "boundary.observed": 2,
+        "grant.freeze": 1,
+        "limits.execution-observed": 1,
+        "result.commit": 1,
+        "run.accept": 1,
+        "run.read": 37,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "normal",
+      "run_id": "fdb385ed-0afa-48a2-a542-b0d69a17bebe",
+      "attempt_id": "0f5bf758-c519-4661-add4-68ba84676fb5",
+      "status": "failed",
+      "failure": "budget_exceeded",
+      "deadline_at": "2026-09-14T03:17:40.481Z",
+      "accepted_at": "2026-09-14T03:16:40.481Z",
+      "terminal_at": "2026-09-14T03:16:57.269Z",
+      "allocation": {
+        "operation_id": "b5c59491-9cc3-44ca-9bf0-feee31b0d10b",
+        "resource_id": "39cafd91-34b7-4a9f-a5e7-b118b5cb8708",
+        "creation_pending": false,
+        "input_copy_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 2,
+        "boundary.call": 6,
+        "boundary.observed": 4,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "input.bind": 1,
+        "input.copy-intent": 1,
+        "input.copy-returned": 1,
+        "input.loaded": 1,
+        "limits.execution-observed": 1,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 84,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "normal",
+      "run_id": "17e546e7-fce9-474f-b5ab-77b5a40eb307",
+      "attempt_id": "d1ed3b79-93f1-4b9a-ba81-478591487012",
+      "status": "timed_out",
+      "failure": "deadline_exceeded",
+      "deadline_at": "2026-09-14T03:17:12.768Z",
+      "accepted_at": "2026-09-14T03:16:57.768Z",
+      "terminal_at": "2026-09-14T03:17:12.769Z",
+      "allocation": {
+        "operation_id": "e8f061a5-2b05-4d00-b633-3bf83e5a4cce",
+        "resource_id": "4d9dfc8f-0574-4074-b5e4-ee517f5ee589",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 2,
+        "boundary.observed": 1,
+        "execution.force-stop-intent": 1,
+        "execution.stop-observed": 1,
+        "grant.freeze": 1,
+        "limits.execution-observed": 1,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 76,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "directory": "pressure",
+      "run_id": "aecf992c-d3f0-4be1-8a6b-19b30b33a139",
+      "attempt_id": "f9dde3a0-2fb4-42ea-b74d-41f27d6f4c68",
+      "status": "failed",
+      "failure": "budget_exceeded",
+      "deadline_at": "2026-09-14T03:15:58.124Z",
+      "accepted_at": "2026-09-14T03:14:58.124Z",
+      "terminal_at": "2026-09-14T03:15:23.882Z",
+      "allocation": {
+        "operation_id": "ea785d91-7474-4d27-b3e8-2b3e8c96c11e",
+        "resource_id": "dc0d86b4-dbb5-4be6-95e8-8f7b0b5d5e16",
+        "creation_pending": false
+      },
+      "audit_counts": {
+        "attempt.start-intent": 1,
+        "boundary.action-admit": 1,
+        "boundary.call": 3,
+        "boundary.observed": 2,
+        "execution.force-stop-intent": 2,
+        "execution.stop-observed": 2,
+        "grant.freeze": 1,
+        "limits.execution-observed": 2,
+        "limits.terminate": 1,
+        "run.accept": 1,
+        "run.fail": 1,
+        "run.read": 131,
+        "sandbox.cleanup-observed": 1,
+        "sandbox.create-intent": 1,
+        "sandbox.create-receipt": 1,
+        "sandbox.prepared": 1
+      },
+      "submission_outcomes": [
+        {
+          "action": "run.accept",
+          "outcome": "accepted",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "id": "dea32264f90ec3e721d0ce715954025ac6a3c5d1ff605d1c6669141d463f3bda",
+      "name": "/atomicagent-ticket11-guardian",
+      "image": "sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2",
+      "state": "running",
+      "exit": 0,
+      "memory": 134217728,
+      "cpu_nano": 250000000
+    },
+    {
+      "id": "21709292b4d780d411d38afcfa05ed0dcd185b6055e673bdd30510b3197927d3",
+      "name": "/atomicagent-ticket11-model",
+      "image": "sha256:ae8f854c49aa401123e8f282aa7914aa1a4ee1bed185d15b1b04917c4b452677",
+      "state": "running",
+      "exit": 0,
+      "memory": 134217728,
+      "cpu_nano": 250000000
+    },
+    {
+      "id": "d64624271a8ca6abac81b917fc1d0c4b6dbf9a3f60d815f75242fc9cc4da8378",
+      "name": "/atomicagent-ticket11-server",
+      "image": "sha256:7c3decc295f65c5b1224d8fc4e8fbaf4a06b3b4710d62247e8238b4fd9d14f14",
+      "state": "running",
+      "exit": 0,
+      "memory": 402653184,
+      "cpu_nano": 500000000
+    }
+  ]
+}

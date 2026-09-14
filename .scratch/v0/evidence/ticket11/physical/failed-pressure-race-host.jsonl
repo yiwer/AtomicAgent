@@ -1,0 +1,22 @@
+{"driver_id": "a455eff05cc05055b5e9d03e76703336449f2d1469dec12b84e3c18807c8f2f9", "mode": "pressure", "image": "sha256:041bd4c0defc5705e635a5e05ca871bcf445377a843b9fd418fcceacaa0198eb", "observed_at": "2026-09-14T03:05:01.091183+00:00"}
+Traceback (most recent call last):
+  File "/tmp/atomicagent-ticket11-work/observe-limits-experiment.py", line 37, in <module>
+    run=json.loads(accepted_path.read_text())
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+{"driver_id": "a455eff05cc05055b5e9d03e76703336449f2d1469dec12b84e3c18807c8f2f9", "mode": "pressure", "image": "sha256:041bd4c0defc5705e635a5e05ca871bcf445377a843b9fd418fcceacaa0198eb", "observed_at": "2026-09-14T03:05:35.469428+00:00"}
+Traceback (most recent call last):
+  File "/tmp/atomicagent-ticket11-work/observe-limits-experiment.py", line 44, in <module>
+    container=wait(find)
+              ^^^^^^^^^^
+  File "/tmp/atomicagent-ticket11-work/observe-limits-experiment.py", line 31, in wait
+    raise RuntimeError('bounded_observation_timeout')
+RuntimeError: bounded_observation_timeout

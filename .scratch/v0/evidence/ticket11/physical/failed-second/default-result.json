@@ -1,0 +1,49 @@
+{
+  "run_id": "21125046-0962-44f0-a482-a844f353143b",
+  "status": "failed",
+  "phase": "terminal",
+  "failure": "provisioning_failed",
+  "resource_limits": null,
+  "limit_termination": null,
+  "accepted_at": "2026-09-14T02:40:13.415Z",
+  "terminal_at": "2026-09-14T02:40:46.153Z",
+  "attempt_id": null,
+  "submission_digest": "adcc274600eb50177e755938307209231f6292a2f9735622bebdd095647a0a62",
+  "boundary": null,
+  "cleanup": {
+    "status": "unknown",
+    "observed_at": "2026-09-14T02:40:46.164Z",
+    "source": "opensandbox"
+  },
+  "cancellation": null,
+  "stop": null,
+  "validation": null,
+  "skills": [],
+  "mcp": [],
+  "inputs": [],
+  "execution": {
+    "limits": {
+      "concurrency": 2,
+      "total_timeout_seconds": 120,
+      "input_bytes": 52428800,
+      "artifact_bytes": 104857600,
+      "cpu": 2,
+      "memory_mib": 4096,
+      "policy_revision": 1,
+      "workspace_bytes": 190840832,
+      "pids": 128
+    },
+    "mcp": [],
+    "skills": [],
+    "manifest_digest": "7802b36f2633876a415a87047a1077b8034b031f3731448bc37b8fef811045d7",
+    "profile": "provider-limits@1",
+    "mode": "opensandbox",
+    "model": "controlled-model",
+    "sdk": "0.3.270",
+    "cli": "bundled-with-sdk-0.3.270",
+    "node": "24.18.0",
+    "image": "sha256:24348fc25a45c3e89395b0c89ac9c798c2805ba3a487b357571efdf40398f347",
+    "deadline_at": "2026-09-14T02:42:13.415Z",
+    "output_contract": "summary-value@1"
+  }
+}

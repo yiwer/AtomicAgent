@@ -1,0 +1,301 @@
+{
+  "run_id": "2651293a-733d-43cd-950e-bbcd1497794e",
+  "status": "succeeded",
+  "phase": "terminal",
+  "failure": null,
+  "resource_limits": {
+    "source": "trusted-supervisor:cgroup-v2-and-tmpfs",
+    "observed_at": "2026-09-14T02:41:48.940Z",
+    "cpu_quota": 200000,
+    "cpu_period": 100000,
+    "memory_bytes": 4294967296,
+    "workspace_bytes": 190840832,
+    "deadline_at": "2026-09-14T02:43:46.644Z",
+    "memory_events": {
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0
+    }
+  },
+  "limit_termination": null,
+  "accepted_at": "2026-09-14T02:41:46.644Z",
+  "terminal_at": "2026-09-14T02:43:31.187Z",
+  "attempt_id": "16689ba4-2525-41e3-8215-22bba855fa79",
+  "submission_digest": "adcc274600eb50177e755938307209231f6292a2f9735622bebdd095647a0a62",
+  "boundary": {
+    "run_id": "2651293a-733d-43cd-950e-bbcd1497794e",
+    "attempt_id": "16689ba4-2525-41e3-8215-22bba855fa79",
+    "source": "controlled-runner:namespace-and-gateway",
+    "observed_at": "2026-09-14T02:43:30.021Z",
+    "isolation": "enforced",
+    "audit_coverage": "partial",
+    "calls": [
+      {
+        "invocation_id": "54311cb1-e233-4785-ac20-d442567cfca5",
+        "boundary": "transport",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T02:41:51.633Z"
+      },
+      {
+        "invocation_id": "e001f86c-7a5b-458a-b1e8-7d76bc55a755",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T02:41:51.821Z"
+      },
+      {
+        "invocation_id": "e001f86c-7a5b-458a-b1e8-7d76bc55a755",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T02:41:51.886Z"
+      },
+      {
+        "invocation_id": "e001f86c-7a5b-458a-b1e8-7d76bc55a755",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T02:41:51.935Z"
+      },
+      {
+        "invocation_id": "e001f86c-7a5b-458a-b1e8-7d76bc55a755",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:02.437Z"
+      },
+      {
+        "invocation_id": "c3a5d5dd-063a-4cdf-8c11-8e5acc9a02dd",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T02:42:03.002Z"
+      },
+      {
+        "invocation_id": "c3a5d5dd-063a-4cdf-8c11-8e5acc9a02dd",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T02:42:03.057Z"
+      },
+      {
+        "invocation_id": "c3a5d5dd-063a-4cdf-8c11-8e5acc9a02dd",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T02:42:03.107Z"
+      },
+      {
+        "invocation_id": "c3a5d5dd-063a-4cdf-8c11-8e5acc9a02dd",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:13.594Z"
+      },
+      {
+        "invocation_id": "19fa3754-f231-42db-a1c5-c6466e709349",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T02:42:14.757Z"
+      },
+      {
+        "invocation_id": "19fa3754-f231-42db-a1c5-c6466e709349",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T02:42:14.793Z"
+      },
+      {
+        "invocation_id": "19fa3754-f231-42db-a1c5-c6466e709349",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T02:42:14.816Z"
+      },
+      {
+        "invocation_id": "19fa3754-f231-42db-a1c5-c6466e709349",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:25.303Z"
+      },
+      {
+        "invocation_id": "14fb693b-4a79-444f-a9bf-cfc7bbbc5754",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T02:42:27.799Z"
+      },
+      {
+        "invocation_id": "14fb693b-4a79-444f-a9bf-cfc7bbbc5754",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T02:42:27.889Z"
+      },
+      {
+        "invocation_id": "14fb693b-4a79-444f-a9bf-cfc7bbbc5754",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T02:42:27.904Z"
+      },
+      {
+        "invocation_id": "14fb693b-4a79-444f-a9bf-cfc7bbbc5754",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:38.390Z"
+      },
+      {
+        "invocation_id": "63496242-6e81-4b0c-bb8f-a3e334db196b",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T02:42:43.138Z"
+      },
+      {
+        "invocation_id": "63496242-6e81-4b0c-bb8f-a3e334db196b",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T02:42:43.206Z"
+      },
+      {
+        "invocation_id": "63496242-6e81-4b0c-bb8f-a3e334db196b",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T02:42:43.245Z"
+      },
+      {
+        "invocation_id": "63496242-6e81-4b0c-bb8f-a3e334db196b",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:53.734Z"
+      },
+      {
+        "invocation_id": "6bec4664-605e-41cb-a316-6e83b68e5c80",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T02:43:02.684Z"
+      },
+      {
+        "invocation_id": "6bec4664-605e-41cb-a316-6e83b68e5c80",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T02:43:02.770Z"
+      },
+      {
+        "invocation_id": "6bec4664-605e-41cb-a316-6e83b68e5c80",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T02:43:02.789Z"
+      },
+      {
+        "invocation_id": "6bec4664-605e-41cb-a316-6e83b68e5c80",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:43:13.278Z"
+      },
+      {
+        "invocation_id": "e9d3419e-c74e-4bcb-b880-b91f6b593a70",
+        "boundary": "model",
+        "outcome": "requested",
+        "observed_at": "2026-09-14T02:43:29.942Z"
+      },
+      {
+        "invocation_id": "e9d3419e-c74e-4bcb-b880-b91f6b593a70",
+        "boundary": "model",
+        "outcome": "admitted",
+        "observed_at": "2026-09-14T02:43:29.965Z"
+      },
+      {
+        "invocation_id": "e9d3419e-c74e-4bcb-b880-b91f6b593a70",
+        "boundary": "model",
+        "outcome": "started",
+        "observed_at": "2026-09-14T02:43:29.996Z"
+      },
+      {
+        "invocation_id": "e9d3419e-c74e-4bcb-b880-b91f6b593a70",
+        "boundary": "model",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T02:43:30.021Z"
+      }
+    ],
+    "call_results": [
+      {
+        "invocation_id": "54311cb1-e233-4785-ac20-d442567cfca5",
+        "boundary": "transport",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T02:41:51.633Z"
+      },
+      {
+        "invocation_id": "e001f86c-7a5b-458a-b1e8-7d76bc55a755",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:02.437Z"
+      },
+      {
+        "invocation_id": "c3a5d5dd-063a-4cdf-8c11-8e5acc9a02dd",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:13.594Z"
+      },
+      {
+        "invocation_id": "19fa3754-f231-42db-a1c5-c6466e709349",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:25.303Z"
+      },
+      {
+        "invocation_id": "14fb693b-4a79-444f-a9bf-cfc7bbbc5754",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:38.390Z"
+      },
+      {
+        "invocation_id": "63496242-6e81-4b0c-bb8f-a3e334db196b",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:42:53.734Z"
+      },
+      {
+        "invocation_id": "6bec4664-605e-41cb-a316-6e83b68e5c80",
+        "boundary": "model",
+        "outcome": "failed",
+        "observed_at": "2026-09-14T02:43:13.278Z"
+      },
+      {
+        "invocation_id": "e9d3419e-c74e-4bcb-b880-b91f6b593a70",
+        "boundary": "model",
+        "outcome": "completed",
+        "observed_at": "2026-09-14T02:43:30.021Z"
+      }
+    ]
+  },
+  "cleanup": {
+    "status": "complete",
+    "observed_at": "2026-09-14T02:43:31.604Z",
+    "source": "opensandbox"
+  },
+  "cancellation": null,
+  "stop": null,
+  "validation": {
+    "status": "passed",
+    "contract": "summary-value@1",
+    "checks": [
+      "schema"
+    ]
+  },
+  "skills": [],
+  "mcp": [],
+  "inputs": [],
+  "execution": {
+    "limits": {
+      "concurrency": 2,
+      "total_timeout_seconds": 120,
+      "input_bytes": 52428800,
+      "artifact_bytes": 104857600,
+      "cpu": 2,
+      "memory_mib": 4096,
+      "policy_revision": 1,
+      "workspace_bytes": 190840832,
+      "pids": 128
+    },
+    "mcp": [],
+    "skills": [],
+    "manifest_digest": "8c6299aae9a96fa42275044e7b3df0aaedcd7aa76f4d2f90e82f50ceefe0e1cd",
+    "profile": "provider-limits@1",
+    "mode": "opensandbox",
+    "model": "controlled-model",
+    "sdk": "0.3.270",
+    "cli": "bundled-with-sdk-0.3.270",
+    "node": "24.18.0",
+    "image": "sha256:32a3a2233a3492898f7a4ad0603afcadb6d776d785a7aa4464d72d42e698e3b3",
+    "deadline_at": "2026-09-14T02:43:46.644Z",
+    "output_contract": "summary-value@1"
+  }
+}
