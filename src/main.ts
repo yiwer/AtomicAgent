@@ -12,7 +12,7 @@ import { contentDigest } from './submission.js';
 async function main() {
   const configPath = process.env.ATOMIC_CONFIG ?? '.local/config.json';
   const config = JSON.parse(await readFile(configPath, 'utf8')) as {
-    profile: Profile; identities: Identity[]; database: string; port: number;
+    profile: Profile; identities: Identity[]; database: string; port: number; host?: '127.0.0.1' | '0.0.0.0';
     opensandbox?: { domain: string; api_key_ref: string };
     approved_profiles?: Profile[];
     isolation_qualified_images?: string[];
@@ -67,7 +67,8 @@ async function main() {
         if (confirmation && (typeof confirmation.approval_ref !== 'string' || !/^[\w:./-]{1,160}$/.test(confirmation.approval_ref))) throw new Error('invalid_legacy_binding_confirmation');
         return { id: `provider:${p.ref}`, document: contentDigest(p), ...(confirmation ? { legacyApproval: `approval-${contentDigest(confirmation)}` } : {}) };
       }) });
-    const url = await app.listen(config.port);
+    if (config.host !== undefined && !['127.0.0.1', '0.0.0.0'].includes(config.host)) throw new Error('invalid_listen_host');
+    const url = await app.listen(config.port, config.host);
     process.stdout.write(`AtomicAgent ${config.profile.mode}: ${url}\n`);
     await new Promise<void>(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve); });
   } finally {

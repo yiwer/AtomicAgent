@@ -1,0 +1,12 @@
+**
+!package.json
+!package-lock.json
+!dist/
+!dist/src/
+!dist/src/**
+!dist/scripts/
+!dist/scripts/**
+!web/
+!web/**
+!deploy/
+!deploy/cloud-check.mjs

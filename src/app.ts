@@ -385,8 +385,8 @@ export async function createApp(options: AppOptions) {
   server.requestTimeout = 10_000;
   server.headersTimeout = 10_000;
   return {
-    async listen(port = 0) {
-      await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+    async listen(port = 0, host = '127.0.0.1') {
+      await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
       const address = server.address();
       if (!address || typeof address === 'string') throw new Error('listen_failed');
       return `http://127.0.0.1:${address.port}`;

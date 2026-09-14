@@ -1,0 +1,67 @@
+name: CI and cloud deployment
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: python3 -m unittest discover -s tests -p '*_test.py'
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://agent.91boy.cn
+    concurrency:
+      group: atomicagent-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.18.0
+          cache: npm
+      - run: npm ci && npm run build
+      - name: Build immutable app image
+        run: docker build -f deploy/Dockerfile.app --build-arg REVISION="$GITHUB_SHA" -t "atomicagent-app:$GITHUB_SHA" .
+      - name: Install deployment SSH identity
+        env:
+          DEPLOY_KEY: ${{ secrets.ATOMIC_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ATOMIC_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/atomicagent
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/atomicagent ~/.ssh/known_hosts
+      - name: Deploy and verify authenticated fixture execution
+        run: |
+          set -euo pipefail
+          if [[ $(git ls-remote origin refs/heads/main | cut -f1) != "$GITHUB_SHA" ]]; then
+            echo 'A newer main commit exists; skip this superseded deployment.'
+            exit 0
+          fi
+          docker save "atomicagent-app:$GITHUB_SHA" | gzip -1 | ssh -i ~/.ssh/atomicagent -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 atomicagent-deploy@159.75.158.26 "deploy $GITHUB_SHA"
+          curl --fail --retry 3 --retry-delay 2 https://agent.91boy.cn/ -o /dev/null
