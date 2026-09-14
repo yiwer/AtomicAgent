@@ -1,3 +1,5 @@
+import { resourceEvidence } from './resource-limits.js';
+import { Limits } from './limits.js';
 import { validateResearch, researchMarkdown, type SourceReceipt, type McpEvidence, validateMcpEvidence } from './research.js';
 import { validateSkillEvidence, type ObserveSkills } from './skills.js';
 import { randomUUID } from 'node:crypto';
@@ -21,14 +23,16 @@ async function beforeDeadline<T>(operation: Promise<T>, signal: AbortSignal): Pr
   finally { signal.removeEventListener('abort', abort); }
 }
 export class Worker {
-  private active: Promise<void> | null = null;
+  private active = new Map<string,Promise<void>>();
+  private scheduler: ReturnType<typeof setInterval>;
   private stopping = false;
   private closed = false;
   private recordFailure = false;
   private controllers = new Map<string, AbortController>();
   private cancellation: Cancellation;
-  constructor(private store: Store, private sandbox: SandboxPort, private files: Files, cancellationClock?: () => number) {
+  constructor(private store: Store, private sandbox: SandboxPort, private files: Files, cancellationClock?: () => number, private limits?: Limits) {
     this.cancellation = new Cancellation(store, sandbox, run => this.cleanup(run), () => this.wake(), cancellationClock);
+    this.scheduler=setInterval(()=>this.wake(),100);this.scheduler.unref();
   }
   cancel(id: string) { if (this.store.get(id)?.cancellation?.decision === 'accepted') this.controllers.get(id)?.abort(); this.cancellation.wake(); }
   cancelRecordFailure(run: Run) { this.recordFailure = true; this.controllers.get(run.run_id)?.abort(new TaskError('execution_lost')); this.cancellation.recordFailure(run); }
@@ -36,7 +40,7 @@ export class Worker {
   async recover() {
     let recordFailure = false;
     for (const run of this.store.all()) {
-      try { if (run.status === 'running') this.finish(run.run_id, 'execution_lost'); }
+      try { if (run.status === 'running') this.finish(run.run_id, Date.now()>=Date.parse(run.manifest.deadline_at)?'deadline_exceeded':'execution_lost'); }
       catch { recordFailure = true; }
       // Already-read immutable identities remain usable for disposal when a business or audit write fails.
       try { if (run.status !== 'queued' && run.cleanup.status !== 'complete' && run.cancellation?.decision !== 'accepted') await this.cleanup(run); }
@@ -46,23 +50,37 @@ export class Worker {
     this.cancellation.wake();
   }
   wake() {
-    if (this.active || this.stopping || this.recordFailure) return;
-    this.active = this.drain().catch(() => { /* No raw error payload at an observation exit. Durable running intent is recovered on restart. */ })
-      .finally(() => { this.active = null; });
+    if(this.stopping||this.recordFailure)return;
+    try {
+      for(const run of this.store.all())if(!run.terminal_at&&Date.parse(run.manifest.deadline_at)<=Date.now()){
+        this.controllers.get(run.run_id)?.abort(new TaskError('deadline_exceeded'));
+        if(run.status==='queued'){this.finish(run.run_id,'deadline_exceeded');this.cancellation.wake();}
+      }
+      const records=this.store.all();
+      const occupied=records.filter(r=>this.active.has(r.run_id)||r.status==='running'||r.allocation&&r.cleanup.status!=='complete'||r.stop&& !['stopped','not_started'].includes(r.stop.status));
+      let slots=2-occupied.length;
+      const workspaceCounts=new Map<string,number>();for(const run of occupied)workspaceCounts.set(run.workspace,(workspaceCounts.get(run.workspace)??0)+1);
+      for(const run of records.reverse()){
+        if(slots<=0)break;
+        const count=workspaceCounts.get(run.workspace)??0,limit=this.limits?.current(run.workspace).values.concurrency??2;
+        if(run.status!=='queued'||this.active.has(run.run_id)||count>=limit)continue;
+        slots--;workspaceCounts.set(run.workspace,count+1);
+        const operation=this.execute(run).catch(()=>{this.recordFailure=true;}).finally(()=>{this.active.delete(run.run_id);this.wake();});
+        this.active.set(run.run_id,operation);
+      }
+    }catch{this.recordFailure=true;}
   }
-  private async drain() {
-    while (!this.stopping && !this.recordFailure) {
-      if (this.store.all().some(r => r.cancellation?.decision === 'accepted' && r.attempt_id && r.stop?.status !== 'stopped')) return;
-      const run = this.store.all().reverse().find(r => r.status === 'queued');
-      if (!run) return;
-      await this.execute(run);
-    }
-  }
-  private finish(id: string, failure: Failure | null, result?: unknown, artifacts: StoredObject[] = []) {
+  private finish(id: string, failure: Failure | null, result?: unknown, artifacts: StoredObject[] = [], dimension?:'artifact_bytes'|'memory_mib'|'workspace_bytes') {
     if (this.store.get(id)?.terminal_at) return;
     this.store.change(id, failure ? 'run.fail' : 'result.commit', run => {
       if (run.terminal_at) return;
+      if(!failure&&Date.now()>=Date.parse(run.manifest.deadline_at))failure='deadline_exceeded';
       run.failure = failure;
+      if(failure==='deadline_exceeded'||failure==='budget_exceeded'){
+        run.limit_termination??={dimension:failure==='deadline_exceeded'?'total_timeout_seconds':dimension??'artifact_bytes',source:'platform:fixed-execution-limits',observed_at:now()};
+        run.stop={status:run.attempt_id?'pending':'not_started',observed_at:run.attempt_id?null:now(),source:run.attempt_id?null:'platform:no-attempt-intent',forced_at:null};
+        this.store.audit('platform',run.workspace,'limits.terminate',run.limit_termination.dimension,run.run_id,{source:run.limit_termination.source,resource_id:run.allocation?.resource_id??null,operation_id:run.attempt_id,observed_at:run.limit_termination.observed_at});
+      }
       run.status = failure === 'deadline_exceeded' ? 'timed_out' : failure ? 'failed' : 'succeeded';
       run.phase = 'terminal'; run.terminal_at = now();
       if (!failure || failure === 'output_invalid') run.validation = { status: failure ? 'failed' : 'passed', contract: run.manifest.output_contract, checks: failure ? ['output-contract'] : run.manifest.output_contract === 'research-report@1' ? ['schema', 'acquired-sources', 'quote-correspondence', 'markdown', 'durable-transfer', 'semantic-review-not-covered'] : run.manifest.output_contract === 'data-statistics@1' ? ['schema', 'input-integrity', 'required-files', 'decimal-statistics', 'ordered-rows', 'tool-execution', 'durable-transfer'] : ['schema'] };
@@ -151,9 +169,9 @@ export class Worker {
           const known = (id:string) => previous.some(c=>c.invocation_id===id&&c.outcome==='admitted');
           const unseen = checked.calls.filter(call=>!previous.some(old=>old.invocation_id===call.invocation_id && old.outcome===call.outcome));
           if(unseen.some(call=>call.outcome==='admitted' || previous.some(old=>old.invocation_id===call.invocation_id&&old.boundary!==call.boundary)))throw new TaskError('isolation_unavailable');
-          admissionDenied=Boolean(r.terminal_at && unseen.some(call=>call.outcome==='requested'&&!known(call.invocation_id)));
+          admissionDenied=Boolean((r.terminal_at||Date.now()>=Date.parse(r.manifest.deadline_at)) && unseen.some(call=>call.outcome==='requested'&&!known(call.invocation_id)));
           const added = r.terminal_at ? unseen.filter(call=>known(call.invocation_id)&&['completed','failed','unknown'].includes(call.outcome)) : unseen;
-          if(!r.terminal_at) for(const call of [...added])if(call.outcome==='requested'&&!known(call.invocation_id))added.push({...call,outcome:'admitted',observed_at:now()});
+          if(!r.terminal_at&&Date.now()<Date.parse(r.manifest.deadline_at)) for(const call of [...added])if(call.outcome==='requested'&&!known(call.invocation_id))added.push({...call,outcome:'admitted',observed_at:now()});
           if(previous.length+added.length>128)throw new TaskError('policy_denied');
           for (const call of added)
             this.store.audit('platform',r.workspace,call.outcome==='admitted'?'boundary.action-admit':'boundary.call',call.outcome,r.run_id,{ source:checked.source,operation_id:call.invocation_id,resource_id:call.boundary,observed_at:call.observed_at });
@@ -162,7 +180,7 @@ export class Worker {
         // Throw after commit: a mixed terminal snapshot must preserve old call endings but grant no new permit.
         if(admissionDenied)throw new TaskError('execution_lost');
       };
-      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp, observeBoundary), controller.signal);
+      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp, observeBoundary,value=>{const checked=resourceEvidence(executing,value);this.store.change(executing.run_id,'limits.execution-observed',r=>{if(r.terminal_at)throw new TaskError('execution_lost');r.resource_limits=checked;});}), controller.signal);
       if (this.store.get(executing.run_id)?.boundary?.calls.some(c=>c.outcome==='denied')) throw new TaskError('policy_denied');
       const skillEvidence = this.store.get(executing.run_id)!.skills ?? [];
       for (const s of executing.manifest.skills ?? []) {
@@ -200,12 +218,12 @@ export class Worker {
     } catch (error) {
       const failure = controller.signal.aborted ? (controller.signal.reason instanceof TaskError ? controller.signal.reason.code : 'deadline_exceeded') : error instanceof TaskError ? error.code :
         phase === 'preparing' ? 'provisioning_failed' : phase === 'committing' ? 'artifact_commit_failed' : 'runtime_failed';
-      this.finish(queued.run_id, failure);
+      this.finish(queued.run_id, failure,undefined,[],error instanceof TaskError?error.dimension:undefined);
     } finally {
       clearTimeout(timer);
       this.controllers.delete(queued.run_id);
       try { if (this.store.get(queued.run_id)?.status !== 'succeeded') for (const object of staged) await this.files.discard(object); }
-      finally { if (this.store.get(queued.run_id)?.cancellation?.decision === 'accepted' || this.recordFailure) this.cancellation.wake(); else await this.cleanup(latest); }
+      finally { if (this.store.get(queued.run_id)?.cancellation?.decision === 'accepted' || this.store.get(queued.run_id)?.limit_termination || this.recordFailure) this.cancellation.wake(); else await this.cleanup(latest); }
     }
   }
   private async cleanup(run: Run) {
@@ -219,5 +237,5 @@ export class Worker {
     }, { outcome: status, evidence: { source, observed_at: observedAt,
       resource_id: run.allocation?.resource_id ?? null, operation_id: run.allocation?.operation_id ?? null } });
   }
-  async close() { this.stopping = true; await this.active; await this.cancellation.close(); this.closed = true; }
+  async close() { this.stopping = true; clearInterval(this.scheduler); await Promise.allSettled(this.active.values()); await this.cancellation.close(); this.closed = true; }
 }

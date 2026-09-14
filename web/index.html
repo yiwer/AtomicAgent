@@ -6,8 +6,8 @@
     <p class="nav-label">运行管理</p><a href="/" class="nav-item active" aria-current="page">任务运行</a>
     <span class="nav-item muted">运维总览 <small>未接入</small></span><span class="nav-item muted">资源回收 <small>未接入</small></span>
     <p class="nav-label">能力与配置</p><button id="open-configurations" class="nav-item" hidden>环境与模型</button><button id="open-skills" class="nav-item" hidden>Skills</button><button id="open-mcp" class="nav-item" hidden>MCP 只读研究</button>
-    <p class="nav-label">平台治理</p><span class="nav-item muted">权限与审计 <small>未接入</small></span>
-    <footer>独立任务 · 明确交付<br>v0 / ticket01–06</footer>
+    <p class="nav-label">平台治理</p><button id="open-limits" class="nav-item" hidden>额度与限制</button><span class="nav-item muted">权限与审计 <small>未接入</small></span>
+    <footer>独立任务 · 明确交付<br>v0 / ticket01–11</footer>
   </aside>
   <div class="layout"><header><span>工作区 / 任务运行</span><div><span id="identity">未登录</span><button id="logout" hidden>退出</button></div></header>
     <main>
@@ -37,7 +37,7 @@
     </main>
   </div>
   <dialog id="detail"><div class="detail-head"><div><p class="eyebrow">RUN DETAIL</p><h2>任务详情</h2></div><button id="close-detail" aria-label="关闭详情">关闭</button></div>
-    <p id="detail-id" class="mono"></p><p id="event-status" role="status"></p><p id="event-progress" class="muted"></p><dl id="facts"></dl><section id="cancellation"><h3>取消与实际停止</h3><p id="cancel-facts"></p><button id="cancel-run">取消任务</button><p id="cancel-error" role="status"></p></section><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>任务产物</h3><div id="artifacts"></div><p id="artifact-error" role="status"></p><h3>输入来源与独立副本</h3><div id="input-bindings"></div><h3>隔离与只读边界</h3><p id="boundary-summary"></p><pre id="boundary-evidence"></pre><h3>MCP 证据</h3><pre id="mcp-evidence"></pre><h3>Skill 证据</h3><div id="skill-evidence"></div><h3>固定执行依据</h3><pre id="manifest"></pre>
+    <p id="detail-id" class="mono"></p><p id="event-status" role="status"></p><p id="event-progress" class="muted"></p><dl id="facts"></dl><section id="cancellation"><h3>取消与实际停止</h3><p id="cancel-facts"></p><button id="cancel-run">取消任务</button><p id="cancel-error" role="status"></p></section><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>任务产物</h3><div id="artifacts"></div><p id="artifact-error" role="status"></p><h3>输入来源与独立副本</h3><div id="input-bindings"></div><h3>隔离与只读边界</h3><p id="boundary-summary"></p><pre id="boundary-evidence"></pre><h3>MCP 证据</h3><pre id="mcp-evidence"></pre><h3>Skill 证据</h3><div id="skill-evidence"></div><h3>实际限制观测</h3><pre id="resource-limits"></pre><h3>固定执行依据</h3><pre id="manifest"></pre>
   </dialog>
   <dialog id="configurations"><div class="detail-head"><div><p class="eyebrow">CONFIGURATION REVISIONS</p><h2>环境与模型</h2></div><button id="close-configurations">关闭配置</button></div>
     <p class="notice">模型兼容性未取证。发布与停用只影响新接纳，已有 Run 保留固定清单和授权。</p>
@@ -57,4 +57,11 @@
     <section id="configuration-preview" data-testid="configuration-preview" hidden><h3>发布前核对</h3><p>仅影响显式选择此修订的新任务。旧 Run 清单不改写；停用不撤销已授予能力。</p><pre id="configuration-changes"></pre><h3>旧 Run 固定引用</h3><pre id="configuration-impact"></pre><button id="commit-configuration" class="primary">确认发布</button></section>
     <h3>最近配置操作</h3><pre id="configuration-audit">等待读取</pre>
   </dialog>
+<dialog id="limits"><div class="detail-head"><h2>额度与限制</h2><button id="close-limits">关闭限额</button></div>
+<p id="limits-current"></p><p class="notice">总期限包含排队、准备、执行、验证与结果提交。新任务还受所选环境的更紧期限约束。降低槽位不会终止已有执行；实际停止未知的资源继续占位。</p>
+<p>CPU 为节流上限；内存与工作目录容量由执行层约束。产物累计超量会终止任务。硬金额上限不支持；fixture 不证明实际资源限制。</p>
+<p id="limits-error" role="alert"></p><p id="limits-result" role="status"></p><button id="limits-recover" hidden>找回未确认限额发布</button><button id="limits-refresh">读取最新限额</button>
+<form id="limits-form"><div id="limits-fields"></div><label for="limits-reason">限额调整理由</label><input id="limits-reason" maxlength="300" required><button id="limits-preview-button" type="submit">预览限额变更</button></form>
+<section id="limits-review" hidden><h3>发布前核对</h3><pre id="limits-changes"></pre><p>仅新 Run 冻结新执行限制；新的并发策略影响后续启动。旧 Run 清单不改写，既有执行不被终止。</p><button id="limits-publish" class="primary">确认发布限额</button></section>
+<h3>固定修订历史</h3><pre id="limits-history"></pre></dialog>
 </body></html>

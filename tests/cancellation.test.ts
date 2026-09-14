@@ -18,6 +18,12 @@ async function lab(t: TestContext, sandbox = new FixtureSandbox(), cancellationC
   const directory = await mkdtemp(join(tmpdir(), 'atomic-cancel-'));
   const options = { database: join(directory,'runs.db'), profile: fixtureProfile, sandbox, identities, cancellationClock, blobs: storage?.(directory) };
   let app = await createApp(options), url = await app.listen();
+  // These cancellation cases intentionally exercise a one-slot queue under the public policy API.
+  const policyHeaders={Authorization:`Bearer ${identities[2]!.token}`,'Content-Type':'application/json','Idempotency-Key':'cancellation-one-slot'};
+  const policy=await(await fetch(url+'/v1/limits',{headers:policyHeaders})).json();
+  const command={expected_revision:policy.current.revision,values:{...policy.current.values,concurrency:1},reason:'Single-slot cancellation scenario'};
+  const preview=await(await fetch(url+'/v1/limits/preview',{method:'POST',headers:policyHeaders,body:JSON.stringify(command)})).json();
+  assert.equal((await fetch(url+'/v1/limits/commands',{method:'POST',headers:policyHeaders,body:JSON.stringify({...command,preview_digest:preview.preview_digest})})).status,200);
   t.after(async()=>{ await app.close(); await rm(directory,{recursive:true,force:true}); });
   return { sandbox, directory,
     restart: async()=>{ await app.close(); app=await createApp(options); url=await app.listen(); },

@@ -1,3 +1,4 @@
+import { limitsPanel } from './limits.js';
 import { configurationPanel } from './configurations.js';
 import { observeRun } from './events.js';
 const $ = id => document.getElementById(id);
@@ -6,6 +7,7 @@ const errorText = { file_expired: '源文件已过期，请选择仍有效的产
 let me = null, selected = null, loading = false, pending = null, selectedInput = null;
 let observation = null;
 const configurations = configurationPanel({ api, identity: () => me });
+const limits=limitsPanel({api,identity:()=>me});
 function stopObservation() { observation?.stop(); observation = null; }
 function ensureObservation(id, identity) {
   if (observation?.id === id && observation.identity === identity) return;
@@ -53,7 +55,7 @@ async function submitPending() {
   } finally { $('recover-submission').disabled = false; renderPending(); }
 }
 function loggedOut() {
-  configurations.logout();
+  configurations.logout();limits.logout();
   stopObservation();
   me = null; selected = null; selectedInput = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
@@ -95,6 +97,7 @@ async function renderDetail(id, open = false) {
   $('skill-evidence').replaceChildren();
   const state = value => value === null ? '未知' : value ? '是' : '否';
   for (const e of run.skills ?? []) { const row = document.createElement('p'); row.textContent = `${e.id}@${e.version} · 已请求 ${state(e.requested)} · 文件已装载 ${state(e.materialized)} · 引擎已加载 ${state(e.loaded)} · 可调用 ${state(e.callable)} · 实际使用 ${state(e.used)} · ${e.source} · ${JSON.stringify(e.evidence_sources ?? {})} · ${e.observed_at ?? '尚无观测'} · 调用 ${e.invocation_id ?? '无'} · Attempt ${e.attempt_id ?? '尚未开始'}`; $('skill-evidence').append(row); }
+  $('resource-limits').textContent=JSON.stringify({effective:run.execution.limits,observed:run.resource_limits,termination:run.limit_termination,stop:run.stop},null,2);
   $('manifest').textContent = JSON.stringify({ ...run.execution, inputs: run.inputs }, null, 2);
   $('artifacts').replaceChildren(); $('artifact-error').textContent = '';
   for (const artifact of result?.artifacts ?? []) {
@@ -138,7 +141,7 @@ async function refresh() {
   loading = true; const identity = me;
   try {
     if (me.role !== 'health') {
-      await configurations.refresh(); if (me !== identity) return;
+      await configurations.refresh();await limits.refresh(); if (me !== identity) return;
       const data = await api('/v1/runs'); if (me !== identity) return;
       $('runs').replaceChildren(); $('empty').hidden = data.runs.length > 0;
       for (const run of data.runs) {

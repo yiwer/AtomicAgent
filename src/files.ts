@@ -1,3 +1,4 @@
+import { effectiveLimits } from './limits.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { ApiError, now, TaskError, type Identity, type StoredObject, type InputBinding, type LoadedInput, type Run, type FileCandidate } from './domain.js';
 import { type BlobPort } from './blob-store.js';
@@ -22,11 +23,11 @@ export class Files {
     if (Date.parse(object.expires_at) <= Date.now()) throw new ApiError(410, 'file_expired');
     if (object.status !== 'available') throw new ApiError(409, 'file_incomplete');
   }
-  async upload(identity: Identity, value: Record<string, unknown>) {
+  async upload(identity: Identity, value: Record<string, unknown>, inputLimit=INPUT_LIMIT) {
     if (Object.keys(value).some(k => !['format', 'content'].includes(k)) ||
         !['csv', 'json'].includes(String(value.format)) || typeof value.content !== 'string') throw new ApiError(400, 'invalid_file');
     const bytes = Buffer.from(value.content);
-    if (bytes.length > INPUT_LIMIT) throw new ApiError(413, 'input_limit');
+    if (bytes.length > inputLimit) throw new ApiError(413, 'input_limit');
     try { parseRows(value.content, value.format as 'csv' | 'json'); } catch { throw new ApiError(400, 'invalid_file'); }
     const object: StoredObject = { object_id: randomUUID(), kind: 'input', owner: identity.actor, workspace: identity.workspace,
       run_id: null, path: null, format: value.format as 'csv' | 'json', size_bytes: bytes.length, sha256: sha256(bytes),
@@ -111,6 +112,7 @@ export class Files {
     }
   }
   async stage(run: Run, candidates: FileCandidate['files'], signal: AbortSignal): Promise<StoredObject[]> {
+    if(candidates.reduce((sum,file)=>sum+file.bytes.length,0)>effectiveLimits(run).artifact_bytes)throw new TaskError('budget_exceeded');
     const staged: StoredObject[] = []; let retries = 0;
     try {
       for (const file of candidates) {

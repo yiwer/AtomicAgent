@@ -1,3 +1,4 @@
+import { GuardianClient } from './guardian.js';
 import { readFile, mkdir, open, unlink } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { createApp } from './app.js';
@@ -15,6 +16,7 @@ async function main() {
     opensandbox?: { domain: string; api_key_ref: string };
     approved_profiles?: Profile[];
     isolation_qualified_images?: string[];
+    guardian?: {socket_path:string;id:string};
     providers?: { ref: string; endpoint: string; api_key_ref: string }[];
     legacy_provider_binding_confirmations?: { ref: string; endpoint: string; api_key_ref: string; approval_ref: string }[];
   };
@@ -47,6 +49,8 @@ async function main() {
       if (!/^[A-Z][A-Z0-9_]{1,100}$/.test(name) || !process.env[name]) throw new Error('secret_binding_unavailable');
       secrets.set(name, process.env[name]!);
     }
+    const guardian=config.guardian?new GuardianClient(config.guardian.socket_path,config.guardian.id):undefined;
+    if(live.length&&!guardian)throw new Error('independent_guardian_required');
     const fixture = new FixtureSandbox();
     const sandbox = new RoutedSandbox(profiles, profile => {
       if (profile.mode === 'fixture') return fixture;
@@ -55,9 +59,9 @@ async function main() {
       return new OpenSandboxAdapter({ domain: provider.endpoint, apiKey: secrets.get(provider.api_key_ref)! }, reference => {
         if (reference !== profile.secret_ref || !secrets.has(reference)) throw new Error('secret_binding_unavailable');
         return secrets.get(reference)!;
-      }, qualifiedImages);
+      }, qualifiedImages,guardian);
     }, [...profiles.filter(p => p.mode === 'fixture'), ...providers.map(p => ({ mode: 'opensandbox' as const, provider_ref: p.ref, provider_endpoint: p.endpoint }))]);
-    app = await createApp({ database, profile: config.profile, approvedProfiles: config.approved_profiles, identities: config.identities, sandbox,
+    app = await createApp({ guardian, database, profile: config.profile, approvedProfiles: config.approved_profiles, identities: config.identities, sandbox,
       deploymentBindings: providers.map(p => {
         const confirmation = config.legacy_provider_binding_confirmations?.find(c => c.ref === p.ref && c.endpoint === p.endpoint && c.api_key_ref === p.api_key_ref);
         if (confirmation && (typeof confirmation.approval_ref !== 'string' || !/^[\w:./-]{1,160}$/.test(confirmation.approval_ref))) throw new Error('invalid_legacy_binding_confirmation');

@@ -1,3 +1,6 @@
+import { effectiveLimits } from './limits.js';
+import { resourceEvidence, memoryBudgetExceeded, type ResourceEvidence } from './resource-limits.js';
+import type { GuardianClient } from './guardian.js';
 import { validateBoundary, type ObserveBoundary } from './execution-boundary.js';
 import { type ObserveMcp, validateMcpEvidence } from './research.js';
 import { validateSkillEvidence, type ObserveSkills } from './skills.js';
@@ -10,7 +13,7 @@ import { TaskError, type Run, type SandboxPort, type LoadedInput } from './domai
 export class OpenSandboxAdapter implements SandboxPort {
   readonly source = 'opensandbox';
   constructor(private connection: ConnectionConfigOptions, private secrets: (reference: string) => string,
-    private qualifiedImages: readonly string[] = []) {}
+    private qualifiedImages: readonly string[] = [], private guardian?: GuardianClient) {}
   private requireRuntime(run: Run) {
     if (!this.qualifiedImages.includes(run.manifest.profile.image)) throw new TaskError('isolation_unavailable');
   }
@@ -20,16 +23,20 @@ export class OpenSandboxAdapter implements SandboxPort {
   }
   async prepare(run: Run): Promise<string> {
     this.requireRuntime(run);
+    if(!this.guardian)throw new TaskError('resource_limits_unavailable');
+    await this.guardian.register(run);
+    const limits=effectiveLimits(run);
     const profile = run.manifest.profile;
     const sandbox = await Sandbox.create({
-      connectionConfig: this.config(run), image: profile.image, entrypoint: ['tail', '-f', '/dev/null'],
-      timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.manifest.deadline_at) - Date.now()) / 1000)),
+      connectionConfig: this.config(run), image: profile.image, entrypoint: ['node','/opt/atomicagent/dist/src/sandbox-supervisor.js',String(Date.parse(run.manifest.deadline_at)),String(limits.workspace_bytes)],
+      // The pinned provider lease has a 60s minimum. Supervisor + guardian still expire at the original absolute deadline.
+      timeoutSeconds: Math.max(60, Math.ceil((Date.parse(run.manifest.deadline_at) - Date.now()) / 1000)),
       readyTimeoutSeconds: Math.max(1, Math.min(30, (Date.parse(run.manifest.deadline_at) - Date.now()) / 1000)),
-      metadata: { atomicagent_operation: run.allocation!.operation_id, atomicagent_run: run.run_id },
+      metadata: { atomicagent_operation: run.allocation!.operation_id, atomicagent_run: run.run_id, atomicagent_guardian:this.guardian.id },
       extensions: { 'bootstrap.execd.isolation': 'enable' },
       // The pinned Docker server rejects Kubernetes-only secureAccess. Its patched loopback ports
       // are reachable through the authenticated server proxy; they must never be publicly published.
-      env: {}, resource: { cpu: '2', memory: '4Gi' }, secureAccess: false,
+      env: {}, resource: { cpu: String(limits.cpu), memory: `${limits.memory_mib}Mi` }, secureAccess: false,
       networkPolicy: { defaultAction: 'deny', egress: [...new Set([new URL(profile.endpoint).hostname, ...(run.manifest.grant.mcp ?? []).flatMap(b => b.network)])].map(target => ({ action: 'allow' as const, target })) },
     });
     try { return sandbox.id; } finally { await sandbox.close(); }
@@ -48,16 +55,18 @@ export class OpenSandboxAdapter implements SandboxPort {
       }
     } finally { await sandbox.close(); }
   }
-  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary): Promise<unknown> {
+  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary, observeResources?: (value:unknown)=>void): Promise<unknown> {
     signal.throwIfAborted();
     this.requireRuntime(run);
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation!.resource_id!, connectionConfig: this.config(run), readyTimeoutSeconds: 10 });
     let observationImported = false, mcpImported = false;
+    let resources:ResourceEvidence|undefined;
     let pollingDone = false;
     let polling: Promise<void> | undefined;
     const admittedCalls=new Set<string>();
     try {
       signal.throwIfAborted();
+      if(run.manifest.limits){const raw=await sandbox.files.readFile('/run/atomicagent/resources.json',{range:'bytes=0-4096'});if(Buffer.byteLength(raw)>4096)throw new TaskError('resource_limits_unavailable');resources=resourceEvidence(run,JSON.parse(raw));observeResources?.(resources);}
       await sandbox.files.createDirectories([{ path: '/run/atomicagent', mode: 700, owner: 'root', group: 'root' }]);
       await sandbox.files.createDirectories([{ path: '/workspace', mode: 700, owner: 'node', group: 'node' }]);
       const probe = await sandbox.commands.run('node /opt/atomicagent/dist/src/isolation-probe.js', {
@@ -68,7 +77,7 @@ export class OpenSandboxAdapter implements SandboxPort {
       signal.throwIfAborted();
       await sandbox.files.writeFiles([{ path: '/run/atomicagent/request.json', mode: 600, owner: 'root', group: 'root', data: JSON.stringify({
         run_id: run.run_id, mcp: run.manifest.grant.mcp, skills: run.manifest.skills, prompt: run.prompt, model: run.manifest.profile.model, endpoint: run.manifest.profile.endpoint,
-        deadline_at: run.manifest.deadline_at, attempt_id: run.attempt_id,
+        limits:effectiveLimits(run),deadline_at: run.manifest.deadline_at, attempt_id: run.attempt_id,
         output_contract: run.manifest.output_contract, input_path: run.manifest.grant.inputs[0]?.path,
         format: run.manifest.grant.inputs[0]?.format,
       }) }]);
@@ -99,6 +108,7 @@ export class OpenSandboxAdapter implements SandboxPort {
         envs: { ANTHROPIC_API_KEY: token },
         timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.manifest.deadline_at) - Date.now()) / 1000)),
       }, { skipAccumulation: true }, signal);
+      if(resources){const observed=await sandbox.commands.run('cat /sys/fs/cgroup/memory.events',{uid:0,gid:0,timeoutSeconds:2});if(!observed.error&&observed.exitCode===0&&memoryBudgetExceeded(resources.memory_events,observed.logs.stdout.map(line=>line.text).join('')))throw new TaskError('budget_exceeded','memory_mib');}
       if (execution.error || execution.exitCode !== 0) throw new TaskError('runtime_failed');
       const info = await sandbox.files.getFileInfo(['/run/atomicagent/result.json']);
       const size = info['/run/atomicagent/result.json']?.size;
@@ -114,7 +124,7 @@ export class OpenSandboxAdapter implements SandboxPort {
       if (run.manifest.grant.mcp?.length) { observeMcp?.(validateMcpEvidence(run, envelope.mcp)); mcpImported = true; }
       if (envelope.failure) {
         const code = envelope.failure;
-        throw new TaskError(code === 'isolation_unavailable' || code === 'policy_denied' || code === 'input_required' || code === 'authorization_required' || code === 'output_invalid' || code === 'deadline_exceeded' || code === 'required_capability_failed' || code === 'skill_use_unproven' ? code : 'runtime_failed');
+        throw new TaskError(code === 'budget_exceeded' || code === 'resource_limits_unavailable' || code === 'isolation_unavailable' || code === 'policy_denied' || code === 'input_required' || code === 'authorization_required' || code === 'output_invalid' || code === 'deadline_exceeded' || code === 'required_capability_failed' || code === 'skill_use_unproven' ? code : 'runtime_failed');
       }
       if (!observeBoundary || boundary.isolation !== 'enforced' || !boundary.calls.some(c=>c.boundary==='model'&&c.outcome==='completed'&&admittedCalls.has(c.invocation_id)&&boundary.calls.some(start=>start.invocation_id===c.invocation_id&&start.outcome==='started'))) throw new TaskError('isolation_unavailable');
       if (run.manifest.output_contract === 'research-report@1') {

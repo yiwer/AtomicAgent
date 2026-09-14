@@ -1,3 +1,4 @@
+import { outputBytes } from './resource-limits.js';
 // Runs only inside the pinned Linux image, never in the API process or developer workspace.
 import { readFile, writeFile, open, mkdir, rename } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -20,6 +21,8 @@ async function main() {
  await check();
  await writeFile('/workspace/request.json', JSON.stringify({ input_path:request.input_path, format:(request as ClaudeRequest & {format?:string}).format }), { flag:'wx', mode:0o444 });
  const timer = setInterval(() => void check(), 200);
+ let limitFailure=false,checking=false;
+ const limitsTimer=setInterval(()=>{if(checking||!request.limits)return;checking=true;void outputBytes('/workspace/output',request.limits.artifact_bytes).catch(()=>{limitFailure=true;controller.abort(new TaskError('budget_exceeded'));}).finally(()=>{checking=false;});},100);
  const controlRoot = '/run/atomicagent'; await mkdir(controlRoot, { mode:0o700, recursive:true });
  const boundary: BoundaryEvidence = { run_id:request.run_id,attempt_id:request.attempt_id,source:'controlled-runner:namespace-and-gateway',observed_at:new Date().toISOString(),isolation:'unknown',audit_coverage:'partial',calls:[] };
  let journalWrites = Promise.resolve();
@@ -58,12 +61,14 @@ async function main() {
   request.onDenied = async () => record({invocation_id:randomUUID(),boundary:'tool',outcome:'denied',observed_at:new Date().toISOString()});
   const result = await runClaude(request, '/workspace', isolation.query, controller.signal);
   await isolation.close();
+  if(request.limits)await outputBytes('/workspace/output',request.limits.artifact_bytes);
+  if(limitFailure)throw new TaskError('budget_exceeded');
   return { ...result, ...(boundary.calls.some(c=>c.outcome==='denied') ? { failure:'policy_denied' } : {}), boundary };
  } catch (error) {
   boundary.isolation = isolation ? 'unknown':'unavailable'; await persist();
-  return { failure:error instanceof TaskError ? error.code:'isolation_unavailable',boundary };
+  return { failure:limitFailure?'budget_exceeded':error instanceof TaskError ? error.code:'isolation_unavailable',boundary };
  }
- finally { await isolation?.close(); clearInterval(timer);for(const [invocation_id,kind] of pending)await record({invocation_id,boundary:kind,outcome:'unknown',observed_at:new Date().toISOString()}); }
+ finally { await isolation?.close(); clearInterval(timer);clearInterval(limitsTimer);for(const [invocation_id,kind] of pending)await record({invocation_id,boundary:kind,outcome:'unknown',observed_at:new Date().toISOString()}); }
 }
 try { await writeFile('/run/atomicagent/result.json', JSON.stringify(await main()), { flag: 'wx', mode: 0o600 }); }
 catch { process.exitCode = 1; }

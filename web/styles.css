@@ -8,3 +8,6 @@ label:has(#skills-must-use) { display: flex; align-items: center; gap: 0.65rem; 
 #skill-evidence p { overflow-wrap: anywhere; line-height: 1.7; }
 
 .input-binding { overflow-wrap: anywhere; }
+
+#limits-fields > label, #limits-fields > small { display: block; }
+#limits-fields > small { margin: 5px 0 16px; color: var(--muted); }

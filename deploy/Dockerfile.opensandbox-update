@@ -1,0 +1,5 @@
+# The input must be the fixed source + Ticket10 isolation patch image.
+ARG APPROVED_SERVER
+FROM ${APPROVED_SERVER}
+COPY deploy/opensandbox-limits.patch /tmp/limits.patch
+RUN cd /app && patch -p1 < /tmp/limits.patch

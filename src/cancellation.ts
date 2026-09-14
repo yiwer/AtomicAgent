@@ -38,7 +38,7 @@ export class Cancellation {
       if (run.cleanup.status === 'complete' && this.stopped(run)) {
         this.signalled.delete(run.run_id); this.nextCheck.delete(run.run_id); this.emergency.delete(run.run_id); this.known.delete(run.run_id); continue;
       }
-      if (run.cancellation?.decision !== 'accepted') continue;
+      if (run.cancellation?.decision !== 'accepted' && !run.limit_termination) continue;
       this.known.set(run.run_id, run);
       if (this.busy.has(run.run_id)) continue;
       if (this.clock() < Math.max(this.nextCheck.get(run.run_id) ?? 0, Date.parse(run.stop?.retry_at ?? '') || 0)) continue;
@@ -66,7 +66,7 @@ export class Cancellation {
         // Best effort graceful SDK interrupt through the controlled runner. Failure cannot defer the forced deadline.
         void this.sandbox.requestStop?.(run).catch(() => {});
       }
-      if (this.clock() < Date.parse(run.cancellation!.grace_deadline_at!)) return;
+      if (this.clock() < Date.parse(run.limit_termination?.observed_at ?? run.cancellation!.grace_deadline_at!)) return;
       this.nextCheck.set(run.run_id, retryAt);
       let status: 'stopped' | 'unknown' = 'unknown';
       const forcedAt = now();

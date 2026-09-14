@@ -8,7 +8,7 @@ import { fileSchema } from './file-contract.js';
 import { collectFiles } from './sandbox-files.js';
 import { requestedSkills, verifySkill, type SkillBinding } from './skills.js';
 
-export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[]; evidence_root?: string; onDenied?: () => Promise<void>; authorizeAction?: (boundary:'tool'|'mcp', invocation_id?:string)=>Promise<string>; finishAction?: (invocation_id:string,outcome:'completed'|'failed')=>Promise<void> }
+export interface ClaudeRequest { limits?: import('./limits.js').ExecutionLimits; prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[]; evidence_root?: string; onDenied?: () => Promise<void>; authorizeAction?: (boundary:'tool'|'mcp', invocation_id?:string)=>Promise<string>; finishAction?: (invocation_id:string,outcome:'completed'|'failed')=>Promise<void> }
 export type QueryPort = (input: Parameters<typeof query>[0]) => AsyncIterable<SDKMessage>;
 // Public engine boundary. The caller supplies an isolated task root; production uses /workspace only.
 export async function runClaude(request: ClaudeRequest, root: string, runQuery: QueryPort = query, cancellation?: AbortSignal) {

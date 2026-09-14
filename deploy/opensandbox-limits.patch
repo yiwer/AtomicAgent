@@ -1,0 +1,19 @@
+--- a/server/opensandbox_server/services/docker/networking.py
++++ b/server/opensandbox_server/services/docker/networking.py
+@@ -433,5 +433,6 @@
+         credential_proxy_enabled: bool = False,
+         extra_env: Optional[Dict[str, Optional[str]]] = None,
++        guardian_labels: Optional[Dict[str, str]] = None,
+     ):
+         sidecar_name = f"sandbox-egress-{sandbox_id}"
+         sidecar_labels = {
+@@ -439,2 +440,3 @@
+             EGRESS_SIDECAR_LABEL: sandbox_id,
++            **(guardian_labels or {}),
+         }
+--- a/server/opensandbox_server/services/docker/docker_service.py
++++ b/server/opensandbox_server/services/docker/docker_service.py
+@@ -854,2 +854,3 @@
+                     extra_env=egress_env or None,
++                    guardian_labels={key: value for key, value in (request.metadata or {}).items() if key in {"atomicagent_guardian", "atomicagent_operation", "atomicagent_run"}},
+                 )

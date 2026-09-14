@@ -1,3 +1,4 @@
+import { Limits } from './limits.js';
 import { boundaryObservation, boundaryCallResults } from './execution-boundary.js';
 import { requestedMcp, researchSchema } from './research.js';
 import { requestedSkills } from './skills.js';
@@ -17,18 +18,18 @@ import { Events } from './events.js';
 import { Configurations } from './configurations.js';
 import { cancellationObservation } from './cancellation.js';
 
-interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; cancellationClock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string; legacyApproval?: string }[] }
+interface AppOptions { guardian?:import('./guardian.js').GuardianPort; database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; cancellationClock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string; legacyApproval?: string }[] }
 const digest = (value: string) => createHash('sha256').update(value).digest();
 function publicRun(run: Run) {
   return {
     run_id: run.run_id, status: run.status, phase: run.phase, failure: run.failure,
-    accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
+    resource_limits:run.resource_limits??null, limit_termination: run.limit_termination ?? null, accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
     submission_digest: submissionDigest(run),
     boundary: run.boundary ? {...run.boundary,call_results:boundaryCallResults(run)} : null, cleanup: run.cleanup, cancellation: run.cancellation ?? null, stop: run.stop ?? null, validation: run.validation, skills: run.skills ?? [], mcp: run.mcp ?? [],
     inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded, binding_id, source, loaded_at }) => ({ file_id, path, sha256, size_bytes, loaded, binding_id, source,
       copy: { run_id: run.run_id, path, loaded_at: loaded_at ?? null, status: loaded ? (run.cleanup.status === 'complete' ? 'removed' : 'loaded') : 'unconfirmed',
         cleanup_status: run.cleanup.status, observed_at: run.cleanup.observed_at, source: run.cleanup.source } })),
-    execution: { mcp: run.manifest.grant.mcp.map(({ sources, ...b }) => ({ ...b, sources: sources.map(({ snapshot, ...source }) => source) })), skills: (run.manifest.skills ?? []).map(({ id, version, must_use, entry, content_digest }) => ({ id, version, must_use, entry, content_digest })), environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
+    execution: { limits:run.manifest.limits ?? null, mcp: run.manifest.grant.mcp.map(({ sources, ...b }) => ({ ...b, sources: sources.map(({ snapshot, ...source }) => source) })), skills: (run.manifest.skills ?? []).map(({ id, version, must_use, entry, content_digest }) => ({ id, version, must_use, entry, content_digest })), environment: run.manifest.environment, model_revision: run.manifest.model, manifest_digest: run.manifest_digest ?? manifestDigest(run.manifest), profile: run.manifest.profile.id, mode: run.manifest.profile.mode, model: run.manifest.profile.model,
       sdk: run.manifest.profile.sdk, cli: run.manifest.profile.cli, node: run.manifest.profile.node,
       image: run.manifest.profile.image, deadline_at: run.manifest.deadline_at, output_contract: run.manifest.output_contract },
   };
@@ -68,7 +69,8 @@ export async function createApp(options: AppOptions) {
   } catch (error) { store.close(); throw error; }
   const files = new Files(store, options.blobs ?? new DiskBlobs(`${options.database}.objects`));
   await files.recover();
-  const worker = new Worker(store, options.sandbox, files, options.cancellationClock);
+  const limits = new Limits(store, [...new Set(options.identities.map(i => i.workspace))]);
+  const worker = new Worker(store, options.sandbox, files, options.cancellationClock, limits);
   try { await worker.recover(); store.initializeEvents(); } catch (error) { await worker.close(); store.close(); throw error; }
   let configurations: Configurations;
   try { configurations = new Configurations(store, options.profile, [options.profile, ...(options.approvedProfiles ?? [])], [...new Set(options.identities.map(i => i.workspace))]); }
@@ -134,7 +136,7 @@ export async function createApp(options: AppOptions) {
       const method = request.method ?? 'GET';
       if (method === 'POST' && request.headers.origin && request.headers.origin !== `http://${request.headers.host}` && request.headers.origin !== `https://${request.headers.host}`)
         throw new ApiError(403, 'origin_denied');
-      if (method === 'GET' && ['/', '/app.js', '/events.js', '/configurations.js', '/styles.css'].includes(path)) {
+      if (method === 'GET' && ['/', '/app.js', '/events.js', '/configurations.js', '/limits.js', '/styles.css'].includes(path)) {
         const file = path === '/' ? 'index.html' : path.slice(1);
         const contents = await readFile(resolve('web', file));
         response.writeHead(200, { 'Content-Type': file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
@@ -168,7 +170,9 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-10', boundary: boundaryObservation(runs), cancellation: cancellationObservation(runs), configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, artifact_reuse: { source: 'platform:durable-input-bindings', observed_at: now(), coverage: 'artifact-copy-confirmation-and-run-cleanup', requested: runs.filter(r => r.manifest.grant.inputs.some(i => i.source)).length, confirmed: runs.filter(r => r.manifest.grant.inputs.some(i => i.source && i.loaded)).length, copy_failed: runs.filter(r => r.failure === 'input_copy_failed').length, source_expired: runs.filter(r => r.failure === 'input_source_expired').length, cleanup_unfinished: runs.filter(r => r.terminal_at && r.manifest.grant.inputs.some(i => i.source) && r.cleanup.status !== 'complete').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        let guardian:unknown={source:'independent-guardian',status:'unknown',observed_at:null,coverage:'not-connected'};
+        if(options.guardian)try{guardian=await options.guardian.observation();}catch{/* Failure stays unknown. */}
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-11', guardian, limits: limits.observation(identity.workspace,runs), boundary: boundaryObservation(runs), cancellation: cancellationObservation(runs), configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, artifact_reuse: { source: 'platform:durable-input-bindings', observed_at: now(), coverage: 'artifact-copy-confirmation-and-run-cleanup', requested: runs.filter(r => r.manifest.grant.inputs.some(i => i.source)).length, confirmed: runs.filter(r => r.manifest.grant.inputs.some(i => i.source && i.loaded)).length, copy_failed: runs.filter(r => r.failure === 'input_copy_failed').length, source_expired: runs.filter(r => r.failure === 'input_source_expired').length, cleanup_unfinished: runs.filter(r => r.terminal_at && r.manifest.grant.inputs.some(i => i.source) && r.cleanup.status !== 'complete').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -178,6 +182,19 @@ export async function createApp(options: AppOptions) {
       }
       if (identity.role === 'health') throw new ApiError(403, 'forbidden');
       if (!worker.acceptingWork && method === 'POST' && (path.startsWith('/v1/configurations') || path === '/v1/files')) throw new ApiError(503, 'core_records_unavailable');
+      if (path === '/v1/limits' && method === 'GET') { send(response,200,limits.list(identity.workspace)); return; }
+      if (['/v1/limits/preview','/v1/limits/commands'].includes(path) && method === 'POST') {
+        if(identity.role!=='maintainer')throw new ApiError(403,'forbidden');
+        if(!worker.acceptingWork)throw new ApiError(503,'core_records_unavailable');
+        const actor=request.headers['x-configuration-actor'],workspace=request.headers['x-configuration-workspace'];
+        if((actor!==undefined||workspace!==undefined)&&(actor!==identity.actor||workspace!==identity.workspace))throw new ApiError(403,'configuration_identity_changed');
+        const input=await body(request);
+        if(path.endsWith('/preview')){send(response,200,limits.preview(identity,input));return;}
+        const key=request.headers['idempotency-key'];
+        if(typeof key!=='string'||!/^[\x21-\x7e]{1,128}$/.test(key))throw new ApiError(400,'command_id_required');
+        configurationNotApplied=!store.configurationCommand(identity.workspace,identity.actor,`limits:${key}`);
+        send(response,200,limits.execute(identity,input,key));configurationNotApplied=false;worker.wake();return;
+      }
       if (path === '/v1/configurations' && method === 'GET') {
         send(response, 200, configurations.list(identity)); return;
       }
@@ -212,7 +229,7 @@ export async function createApp(options: AppOptions) {
           try { content = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new ApiError(400, 'invalid_file_encoding'); }
           input = { format: request.headers['x-file-format'], content };
         } else input = record(await body(request, 64 * 1024 * 1024));
-        const object = await files.upload(identity, input);
+        const object = await files.upload(identity, input,limits.current(identity.workspace).values.input_bytes);
         send(response, 201, publicObject(object)); return;
       }
       const fileMatch = path.match(/^\/v1\/files\/([a-f0-9-]{36})$/);
@@ -234,7 +251,7 @@ export async function createApp(options: AppOptions) {
         if (input.audit_requirement === 'complete') throw new ApiError(422, 'audit_coverage_unavailable');
         const key = request.headers['idempotency-key'];
         if (typeof key !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(key)) throw new ApiError(400, 'idempotency_key_required');
-        if (Object.keys(input).some(k => !['prompt', 'profile', 'environment', 'model', 'output_contract', 'inputs', 'skills', 'mcp'].includes(k)) ||
+        if (Object.keys(input).some(k => !['prompt', 'profile', 'environment', 'model', 'output_contract', 'inputs', 'skills', 'mcp', 'limits'].includes(k)) ||
             typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 8000) throw new ApiError(400, 'invalid_request');
         const requestDigest = contentDigest(input);
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
@@ -263,14 +280,16 @@ export async function createApp(options: AppOptions) {
         const skills = configurations.resolveSkills(identity.workspace, input.skills);
         if (skills.length && input.output_contract !== 'data-statistics@1') throw new ApiError(400, 'skill_contract_unavailable');
         if (input.output_contract === 'summary-value@1' && input.inputs !== undefined) throw new ApiError(400, 'invalid_request');
+        const effective = limits.resolve(identity.workspace,resolved.profile,input.limits);
+        if(bindings.reduce((sum,b)=>sum+b.size_bytes,0)>effective.input_bytes)throw new ApiError(413,'input_limit');
         const acceptedAt = now();
         const run: Run = {
           run_id: randomUUID(), owner: identity.actor, workspace: identity.workspace, prompt: input.prompt,
           request_digest: requestDigest, request_digest_version: 2, ...(mcp.length ? { mcp: mcp.map(requestedMcp) } : {}),
           ...(skills.length ? { skills: requestedSkills(skills) } : {}),
-          manifest: { ...resolved, ...(skills.length ? { skills } : {}), output_contract: input.output_contract as Run['manifest']['output_contract'], schema: mcp.length ? researchSchema : bindings.length ? fileSchema : outputSchema,
+          manifest: { ...resolved, limits:effective, ...(skills.length ? { skills } : {}), output_contract: input.output_contract as Run['manifest']['output_contract'], schema: mcp.length ? researchSchema : bindings.length ? fileSchema : outputSchema,
             grant: { tools: bindings.length ? ['process-data@1'] : [], mcp, inputs: bindings, external_access: mcp.length ? 'registered-readonly' : 'model-only' },
-            deadline_at: new Date(Date.now() + resolved.profile.timeout_seconds * 1000).toISOString() },
+            deadline_at: new Date(Date.parse(acceptedAt) + effective.total_timeout_seconds * 1000).toISOString() },
           status: 'queued', phase: 'queued', failure: null, accepted_at: acceptedAt, terminal_at: null, attempt_id: null,
           allocation: null, cleanup: { status: 'pending', observed_at: null, source: null }, validation: null, result: null,
         };

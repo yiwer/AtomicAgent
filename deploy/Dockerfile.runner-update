@@ -1,0 +1,6 @@
+# Offline-compatible update on an explicitly approved previous runner digest.
+# Build TypeScript with the pinned lockfile before invoking this Dockerfile.
+ARG APPROVED_RUNNER
+FROM ${APPROVED_RUNNER}
+COPY dist/src /opt/atomicagent/dist/src
+COPY dist/scripts /opt/atomicagent/dist/scripts

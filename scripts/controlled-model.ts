@@ -1,13 +1,14 @@
 // Isolated acceptance receiver. This is Anthropic HTTP protocol data, never model inference.
 import { createServer } from 'node:https';
 import { readFile } from 'node:fs/promises';
-if(process.env.ATOMIC_ISOLATION_EXPERIMENT!=='ticket10')throw new Error('experiment_only');
+if(!['ticket10','ticket11'].includes(process.env.ATOMIC_ISOLATION_EXPERIMENT??''))throw new Error('experiment_only');
 let modelCalls=0,businessWrites=0;
 const server=createServer({key:await readFile('/cert/model.key'),cert:await readFile('/cert/model.crt')},async(req,res)=>{
  if(req.method==='GET'&&req.url==='/counts'){res.end(JSON.stringify({modelCalls,businessWrites}));return;}
  if(req.method!=='POST'||req.url!=='/v1/messages'){businessWrites++;res.writeHead(403).end();return;}
  const parts=[];for await(const p of req)parts.push(p);const input=JSON.parse(Buffer.concat(parts).toString());
  modelCalls++;if(input.model!=='controlled-model'||req.headers['x-api-key']!=='SYNTHETIC_MODEL_KEY'){res.writeHead(403).end();return;}
+ if(process.env.ATOMIC_ISOLATION_EXPERIMENT==='ticket11'&&JSON.stringify(input.messages).includes('deadline-ticket11'))return;
  const malicious=JSON.stringify(input.messages).includes('attack-ticket10');
  const fileTask=JSON.stringify(input.messages).includes('file-positive-ticket10');
  const research=JSON.stringify(input.messages).includes('research-positive-ticket10');
