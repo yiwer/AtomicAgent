@@ -55,18 +55,21 @@ test('an already cancelled execution cannot connect or start a new command',asyn
   const controller=new AbortController();controller.abort(new Error('cancelled-before-dispatch'));
   await assert.rejects(adapter.execute({} as Run,controller.signal),/cancelled-before-dispatch/);
 });
-for(const qualified of [false,true])test(`cancellation marker preserves the ${qualified?'isolated':'legacy'} runner path and reader identity`,async t=>{
+for(const [qualified,failedPath] of [[false,''],[true,''],[false,'/run/atomicagent-cancel.json'],[false,'/workspace/cancel.json']] as const)test(`cancellation markers preserve historical protocols: qualified=${qualified}, failed=${failedPath||'none'}`,async t=>{
  let host='',uploaded='';const server=createServer(async(req,res)=>{
   res.setHeader('Content-Type','application/json');
   if(req.url?.includes('/endpoints/')){res.end(JSON.stringify({endpoint:host,headers:{}}));return;}
   if(req.url==='/ping'){res.end('{}');return;}
-  if(req.url==='/files/upload'){for await(const chunk of req)uploaded+=String(chunk);res.writeHead(204).end();return;}
+  if(req.url==='/files/upload'){let body='';for await(const chunk of req)body+=String(chunk);uploaded+=body;res.writeHead(failedPath&&body.includes(failedPath)?403:204).end();return;}
   res.writeHead(500).end('{}');
  });
  await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise<void>(r=>server.close(()=>r())));host=`127.0.0.1:${(server.address() as {port:number}).port}`;
  const adapter=new OpenSandboxAdapter({domain:'http://'+host},()=>{throw new Error('must_not_read_model_key');},qualified?[fixtureProfile.image]:[]);
- await adapter.requestStop({run_id:'run',attempt_id:'attempt',allocation:{resource_id:'owned'},manifest:{profile:fixtureProfile,deadline_at:new Date(Date.now()+30000).toISOString()}} as Run);
- assert.ok(uploaded.includes(qualified?'/run/atomicagent-cancel.json':'/workspace/cancel.json'));assert.ok(uploaded.includes(`"owner":"${qualified?'root':'node'}"`));
+ const stopping=adapter.requestStop({run_id:'run',attempt_id:'attempt',allocation:{resource_id:'owned'},manifest:{profile:fixtureProfile,deadline_at:new Date(Date.now()+30000).toISOString()}} as Run);
+ if(failedPath)await assert.rejects(stopping);else await stopping;
+ // The current execution allowlist cannot identify the protocol of an already running, later revoked image.
+ assert.ok(uploaded.includes('/run/atomicagent-cancel.json'));assert.ok(uploaded.includes('"owner":"root"'));
+ assert.ok(uploaded.includes('/workspace/cancel.json'));assert.ok(uploaded.includes('"owner":"node"'));
 });
 for(const boundary of ['connect','request-upload'] as const) test(`cancellation during OpenSandbox ${boundary} prevents command dispatch`,async t=>{
   const controller=new AbortController();let host='',commands=0;

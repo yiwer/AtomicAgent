@@ -167,10 +167,16 @@ export class OpenSandboxAdapter implements SandboxPort {
   async requestStop(run: Run) {
     if (!run.allocation?.resource_id || !run.attempt_id) return;
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation.resource_id, connectionConfig: { ...this.config(run), requestTimeoutSeconds: 5 }, readyTimeoutSeconds: 5 });
-    // Existing in-flight legacy images retain their original marker and reader; this grants no new execution.
-    const isolated=this.qualifiedImages.includes(run.manifest.profile.image),owner=isolated?'root':'node';
-    try { await sandbox.files.writeFiles([{ path: isolated?'/run/atomicagent-cancel.json':'/workspace/cancel.json', mode: 400, owner, group: owner,
-      data: JSON.stringify({ run_id: run.run_id, attempt_id: run.attempt_id }) }]); }
+    // Admission can be revoked after a Run starts, so it cannot identify the historical stop protocol.
+    // Try both fixed markers independently; neither a write nor this compatibility path proves stopped.
+    try {
+      const failures:unknown[]=[];
+      for(const [path,owner] of [['/run/atomicagent-cancel.json','root'],['/workspace/cancel.json','node']] as const) {
+        try { await sandbox.files.writeFiles([{path,mode:400,owner,group:owner,data:JSON.stringify({run_id:run.run_id,attempt_id:run.attempt_id})}]); }
+        catch(error) { failures.push(error); }
+      }
+      if(failures.length)throw failures[0];
+    }
     finally { await sandbox.close(); }
   }
   async forceStop(run: Run): Promise<'stopped' | 'unknown'> {
