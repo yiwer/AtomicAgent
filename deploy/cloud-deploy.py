@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -58,11 +59,15 @@ def deploy(revision):
     old = subprocess.run(['docker', 'inspect', NAME], capture_output=True, text=True)
     previous = json.loads(old.stdout)[0]['Image'] if old.returncode == 0 else None
     snapshot = ROOT / 'backups' / f'{time.time_ns()}-{revision}'
+    previously_gated = GATE.exists()
     GATE.touch(mode=0o644)
     stopped = False
     backed_up = False
+    previous_healthy = False
     try:
         if previous:
+            check()
+            previous_healthy = True
             # Fail without interruption if registered work remains. Gate prevents new requests.
             check('--idle')
             docker('stop', '--time', '45', NAME)
@@ -87,8 +92,9 @@ def deploy(revision):
                 docker('stop', '--time', '45', NAME)
                 docker('rm', NAME)
             if backed_up:
-                DATA.rename(snapshot.with_name(snapshot.name + '-failed'))
-                subprocess.run(['cp', '-a', '--', str(snapshot), str(DATA)], check=True)
+                # Public traffic stayed gated, so candidate writes are only release probes.
+                shutil.rmtree(DATA)
+                snapshot.rename(DATA)
             if previous:
                 start(previous)
                 ready()
@@ -96,8 +102,13 @@ def deploy(revision):
             else:
                 # No healthy release exists; keep public traffic gated.
                 raise
-        GATE.unlink(missing_ok=True)
+        if stopped or (previous_healthy and not previously_gated):
+            GATE.unlink(missing_ok=True)
         raise
+    # This is a transaction snapshot, not a second indefinite artifact archive.
+    shutil.rmtree(snapshot)
+    if snapshot.exists():
+        raise RuntimeError('Snapshot deletion unconfirmed')
     GATE.unlink(missing_ok=True)
     print(f'Deployed {revision}')
 
