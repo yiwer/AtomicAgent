@@ -4,8 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { execFile, type ChildProcess } from 'node:child_process';
 import { INPUT_LIMIT } from './file-contract.js';
 import { sha256 } from './files.js';
 import { readSandboxFile, collectFiles } from './sandbox-files.js';
@@ -16,6 +15,8 @@ export class FixtureSandbox implements SandboxPort {
   readonly resources = new Set<string>();
   readonly executions = new Set<string>();
   readonly directories = new Map<string, string>();
+  private children = new Map<string, { child: ChildProcess; closed: Promise<void> }>();
+  private stopped = new Set<string>();
   constructor(public scenario: 'success' | 'invalid' | 'prepare-failed' | 'cleanup-unknown' | 'input-required' | 'authorization-required' | 'timeout' = 'success') {}
   async prepare(run: Run) {
     const id = `fixture-${run.allocation!.operation_id}`;
@@ -34,6 +35,8 @@ export class FixtureSandbox implements SandboxPort {
     await writeFile(join(root, 'request.json'), JSON.stringify({ input_path: inputs[0]!.binding.path, format: inputs[0]!.binding.format }));
   }
   async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown> {
+    signal.throwIfAborted();
+    if (this.stopped.has(run.run_id)) throw new TaskError('execution_lost');
     if (this.executions.has(run.run_id)) throw new TaskError('execution_lost');
     this.executions.add(run.run_id);
     if (run.manifest.skills?.length) {
@@ -60,16 +63,33 @@ export class FixtureSandbox implements SandboxPort {
     if (run.manifest.output_contract === 'data-statistics@1') {
       const root = this.directories.get(run.run_id)!;
       const script = fileURLToPath(new URL(import.meta.url.endsWith('.ts') ? './process-data.ts' : './process-data.js', import.meta.url));
-      await promisify(execFile)(process.execPath, [...(script.endsWith('.ts') ? ['--import', 'tsx'] : []), script, root], { signal, timeout: 30_000, maxBuffer: 16_384 });
+      signal.throwIfAborted();
+      if (this.stopped.has(run.run_id)) throw new TaskError('execution_lost');
+      await new Promise<void>((resolve, reject) => {
+        const child = execFile(process.execPath, [...(script.endsWith('.ts') ? ['--import', 'tsx'] : []), script, root], { signal, timeout: 30_000, maxBuffer: 16_384 }, error => error ? reject(error) : resolve());
+        const closed = new Promise<void>(done => child.once('close', () => { this.children.delete(run.run_id); done(); }));
+        this.children.set(run.run_id, { child, closed });
+      });
       return collectFiles(root, JSON.parse(await readFile(join(root, 'statistics.json'), 'utf8')));
     }
     return { summary: 'three apples', value: 3 };
   }
   async cleanup(run: Run) {
     if (this.scenario === 'cleanup-unknown') return 'unknown' as const;
+    if (this.children.has(run.run_id)) return 'unknown' as const;
     const root = this.directories.get(run.run_id);
     if (root) { await rm(root, { recursive: true, force: true }); this.directories.delete(run.run_id); }
     this.resources.delete(run.allocation?.resource_id ?? `fixture-${run.allocation?.operation_id}`);
     return 'absent' as const;
+  }
+  async forceStop(run: Run): Promise<'stopped' | 'unknown'> {
+    this.stopped.add(run.run_id);
+    const owned = this.children.get(run.run_id);
+    if (!owned) return 'stopped';
+    // Only this child's live Node handle is used; never enumerate or kill processes by a recycled numeric PID.
+    if (owned.child.exitCode === null && owned.child.signalCode === null) owned.child.kill('SIGKILL');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try { return await Promise.race([owned.closed.then(() => 'stopped' as const), new Promise<'unknown'>(r => { timer = setTimeout(() => r('unknown'), 5000); })]); }
+    finally { clearTimeout(timer); }
   }
 }

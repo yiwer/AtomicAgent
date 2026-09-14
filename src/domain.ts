@@ -28,10 +28,12 @@ export interface Run {
   skills?: SkillEvidence[]; mcp?: McpEvidence[];
   manifest: { skills?: SkillBinding[]; profile: Profile; environment?: RevisionRef; model?: RevisionRef; output_contract: 'summary-value@1' | 'data-statistics@1' | 'research-report@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema | typeof researchSchema;
     grant: { tools: string[]; mcp: McpBinding[]; inputs: InputBinding[]; external_access: 'model-only' | 'registered-readonly' }; deadline_at: string };
-  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out';
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out' | 'cancelled';
+  cancellation?: { operation_id: string; actor: string; role: Role; requested_at: string; decision: 'accepted' | 'already_terminal'; grace_deadline_at: string | null };
+  stop?: { status: 'pending' | 'stopped' | 'unknown' | 'not_started'; observed_at: string | null; source: string | null; forced_at: string | null; checks?: number; retry_at?: string | null };
   phase: 'queued' | 'preparing' | 'executing' | 'terminal'; failure: Failure | null;
   accepted_at: string; terminal_at: string | null; attempt_id: string | null;
-  allocation: { operation_id: string; resource_id: string | null } | null;
+  allocation: { operation_id: string; resource_id: string | null; creation_pending?: boolean; input_copy_pending?: boolean } | null;
   cleanup: { status: 'pending' | 'complete' | 'unknown' | 'failed'; observed_at: string | null; source: string | null };
   validation: { status: 'passed' | 'failed'; contract: 'summary-value@1' | 'data-statistics@1' | 'research-report@1'; checks?: string[] } | null;
   result: { summary: string; value: number } | FileResult | ResearchResult | null;
@@ -52,6 +54,8 @@ export interface SandboxPort {
   prepare(run: Run): Promise<string>;
   loadInputs?(run: Run, inputs: LoadedInput[]): Promise<void>;
   execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown>;
+  requestStop?(run: Run): Promise<void>;
+  forceStop?(run: Run): Promise<'stopped' | 'unknown'>;
   cleanup(run: Run): Promise<'absent' | 'unknown' | 'present'>;
 }
 export const now = () => new Date().toISOString();

@@ -40,9 +40,11 @@ export class OpenSandboxAdapter implements SandboxPort {
     } finally { await sandbox.close(); }
   }
   async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown> {
+    signal.throwIfAborted();
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation!.resource_id!, connectionConfig: this.config(run), readyTimeoutSeconds: 10 });
     let observationImported = false, mcpImported = false;
     try {
+      signal.throwIfAborted();
       await sandbox.files.createDirectories([{ path: '/workspace', mode: 0o700, owner: 'node', group: 'node' }]);
       await sandbox.files.writeFiles([{ path: '/workspace/request.json', mode: 0o600, owner: 'node', group: 'node', data: JSON.stringify({
         run_id: run.run_id, mcp: run.manifest.grant.mcp, skills: run.manifest.skills, prompt: run.prompt, model: run.manifest.profile.model, endpoint: run.manifest.profile.endpoint,
@@ -52,6 +54,7 @@ export class OpenSandboxAdapter implements SandboxPort {
       }) }]);
       const token = this.secrets(run.manifest.profile.secret_ref);
       if (!token) throw new TaskError('authorization_required');
+      signal.throwIfAborted();
       const execution = await sandbox.commands.run('node /opt/atomicagent/dist/src/runner.js', {
         workingDirectory: '/workspace', uid: 1000, gid: 1000,
         envs: { ANTHROPIC_API_KEY: token },
@@ -115,6 +118,17 @@ export class OpenSandboxAdapter implements SandboxPort {
       }
       throw error;
     } finally { await sandbox.close(); }
+  }
+  async requestStop(run: Run) {
+    if (!run.allocation?.resource_id || !run.attempt_id) return;
+    const sandbox = await Sandbox.connect({ sandboxId: run.allocation.resource_id, connectionConfig: { ...this.config(run), requestTimeoutSeconds: 5 }, readyTimeoutSeconds: 5 });
+    try { await sandbox.files.writeFiles([{ path: '/workspace/cancel.json', mode: 0o400, owner: 'node', group: 'node',
+      data: JSON.stringify({ run_id: run.run_id, attempt_id: run.attempt_id }) }]); }
+    finally { await sandbox.close(); }
+  }
+  async forceStop(run: Run): Promise<'stopped' | 'unknown'> {
+    // Destroying this immutable sandbox stops its entire process namespace. The DELETE receipt is insufficient.
+    return await this.cleanup(run) === 'absent' ? 'stopped' : 'unknown';
   }
   async cleanup(run: Run): Promise<'absent' | 'unknown' | 'present'> {
     const manager = SandboxManager.create({ connectionConfig: { ...this.connection, requestTimeoutSeconds: 10, debug: false, disableMetrics: true } });

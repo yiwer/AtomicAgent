@@ -14,15 +14,16 @@ import { fileSchema, ARTIFACT_LIMIT, INPUT_LIMIT } from './file-contract.js';
 import { contentDigest, manifestDigest, submissionDigest } from './submission.js';
 import { Events } from './events.js';
 import { Configurations } from './configurations.js';
+import { cancellationObservation } from './cancellation.js';
 
-interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string; legacyApproval?: string }[] }
+interface AppOptions { database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; cancellationClock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string; legacyApproval?: string }[] }
 const digest = (value: string) => createHash('sha256').update(value).digest();
 function publicRun(run: Run) {
   return {
     run_id: run.run_id, status: run.status, phase: run.phase, failure: run.failure,
     accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
     submission_digest: submissionDigest(run),
-    cleanup: run.cleanup, validation: run.validation, skills: run.skills ?? [], mcp: run.mcp ?? [],
+    cleanup: run.cleanup, cancellation: run.cancellation ?? null, stop: run.stop ?? null, validation: run.validation, skills: run.skills ?? [], mcp: run.mcp ?? [],
     inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded, binding_id, source, loaded_at }) => ({ file_id, path, sha256, size_bytes, loaded, binding_id, source,
       copy: { run_id: run.run_id, path, loaded_at: loaded_at ?? null, status: loaded ? (run.cleanup.status === 'complete' ? 'removed' : 'loaded') : 'unconfirmed',
         cleanup_status: run.cleanup.status, observed_at: run.cleanup.observed_at, source: run.cleanup.source } })),
@@ -66,11 +67,11 @@ export async function createApp(options: AppOptions) {
   } catch (error) { store.close(); throw error; }
   const files = new Files(store, options.blobs ?? new DiskBlobs(`${options.database}.objects`));
   await files.recover();
-  const worker = new Worker(store, options.sandbox, files);
-  try { await worker.recover(); store.initializeEvents(); } catch (error) { store.close(); throw error; }
+  const worker = new Worker(store, options.sandbox, files, options.cancellationClock);
+  try { await worker.recover(); store.initializeEvents(); } catch (error) { await worker.close(); store.close(); throw error; }
   let configurations: Configurations;
   try { configurations = new Configurations(store, options.profile, [options.profile, ...(options.approvedProfiles ?? [])], [...new Set(options.identities.map(i => i.workspace))]); }
-  catch (error) { store.close(); throw error; }
+  catch (error) { await worker.close(); store.close(); throw error; }
   worker.wake();
   // Observation/session clock is an external test seam; it never sets execution deadlines.
   const clock = options.clock ?? Date.now;
@@ -166,7 +167,7 @@ export async function createApp(options: AppOptions) {
       if (path === '/internal/health' && method === 'GET') {
         if (identity.role === 'caller') throw new ApiError(403, 'forbidden');
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-08', configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, artifact_reuse: { source: 'platform:durable-input-bindings', observed_at: now(), coverage: 'artifact-copy-confirmation-and-run-cleanup', requested: runs.filter(r => r.manifest.grant.inputs.some(i => i.source)).length, confirmed: runs.filter(r => r.manifest.grant.inputs.some(i => i.source && i.loaded)).length, copy_failed: runs.filter(r => r.failure === 'input_copy_failed').length, source_expired: runs.filter(r => r.failure === 'input_source_expired').length, cleanup_unfinished: runs.filter(r => r.terminal_at && r.manifest.grant.inputs.some(i => i.source) && r.cleanup.status !== 'complete').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-09', cancellation: cancellationObservation(runs), configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, artifact_reuse: { source: 'platform:durable-input-bindings', observed_at: now(), coverage: 'artifact-copy-confirmation-and-run-cleanup', requested: runs.filter(r => r.manifest.grant.inputs.some(i => i.source)).length, confirmed: runs.filter(r => r.manifest.grant.inputs.some(i => i.source && i.loaded)).length, copy_failed: runs.filter(r => r.failure === 'input_copy_failed').length, source_expired: runs.filter(r => r.failure === 'input_source_expired').length, cleanup_unfinished: runs.filter(r => r.terminal_at && r.manifest.grant.inputs.some(i => i.source) && r.cleanup.status !== 'complete').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -175,6 +176,7 @@ export async function createApp(options: AppOptions) {
         }); return;
       }
       if (identity.role === 'health') throw new ApiError(403, 'forbidden');
+      if (!worker.acceptingWork && method === 'POST' && (path.startsWith('/v1/configurations') || path === '/v1/files')) throw new ApiError(503, 'core_records_unavailable');
       if (path === '/v1/configurations' && method === 'GET') {
         send(response, 200, configurations.list(identity)); return;
       }
@@ -236,6 +238,7 @@ export async function createApp(options: AppOptions) {
         // Replay precedes source resolution; an expired source must not invalidate the original accepted request.
         const replay = store.replay(identity.actor, identity.workspace, key, requestDigest);
         if (replay) { await replySubmission(request, response, replay, waitSeconds); return; }
+        if (!worker.acceptingWork) throw new ApiError(503, 'core_records_unavailable');
         // Only this confirmed absent binding can authorize discarding a rejected pending submission.
         submissionNotAccepted = true;
         let bindings: Run['manifest']['grant']['inputs'];
@@ -248,6 +251,7 @@ export async function createApp(options: AppOptions) {
         }
         const concurrent = store.replay(identity.actor, identity.workspace, key, requestDigest);
         if (concurrent) { submissionNotAccepted = false; await replySubmission(request, response, concurrent, waitSeconds); return; }
+        if (!worker.acceptingWork) throw new ApiError(503, 'core_records_unavailable');
         const resolved = configurations.resolve(identity.workspace, input);
         if (!['summary-value@1', 'data-statistics@1', 'research-report@1'].includes(String(input.output_contract))) throw new ApiError(400, 'output_contract_unavailable');
         const mcp = configurations.resolveMcp(identity.workspace, input.mcp);
@@ -306,6 +310,19 @@ export async function createApp(options: AppOptions) {
             'Content-Disposition': `attachment; filename="${object.format === 'markdown' ? 'report.md' : object.format === 'csv' ? 'valid.csv' : 'rejected.json'}"`, 'Content-Length': bytes.length });
           response.end(bytes); return;
         }
+      }
+      const cancellation = path.match(/^\/v1\/runs\/([a-f0-9-]{36}):cancel$/);
+      if (cancellation && method === 'POST') {
+        const run = store.get(cancellation[1]!);
+        if (!run || !visible(identity, run)) throw new ApiError(404, 'run_not_found');
+        const actor = request.headers['x-cancellation-actor'], workspace = request.headers['x-cancellation-workspace'];
+        if ((actor !== undefined || workspace !== undefined) && (actor !== identity.actor || workspace !== identity.workspace)) throw new ApiError(403, 'cancellation_identity_changed');
+        if (Object.keys(record(await body(request))).length) throw new ApiError(400, 'invalid_request');
+        let cancelled: Run;
+        try { cancelled = store.cancel(run.run_id, identity, options.cancellationClock?.()); }
+        catch (error) { worker.cancelRecordFailure(run); throw error; }
+        worker.cancel(run.run_id);
+        send(response, 200, publicRun(cancelled)); return;
       }
       const match = path.match(/^\/v1\/runs\/([a-f0-9-]{36})(\/result|\/events)?$/);
       if (match && method === 'GET') {

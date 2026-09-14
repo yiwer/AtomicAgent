@@ -1,4 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
+import { randomUUID } from 'node:crypto';
+import type { Identity } from './domain.js';
 import { ApiError, now, type Profile, type Run, type RunEvent, type StoredObject } from './domain.js';
 import { manifestDigest, submissionDigest } from './submission.js';
 
@@ -130,6 +132,21 @@ export class Store {
     return row ? JSON.parse(row.document as string) as Run : undefined;
   }
   all(): Run[] { return this.db.prepare('SELECT document FROM runs ORDER BY rowid DESC').all().map(r => JSON.parse(r.document as string) as Run); }
+  cancel(id: string, identity: Identity, timestamp = Date.now()): Run {
+    return this.change(id, 'run.cancel-decision', run => {
+      if (run.cancellation) { this.audit(identity.actor, identity.workspace, 'run.cancel-request', 'replayed', id); return; }
+      const accepted = !run.terminal_at, requested_at = new Date(timestamp).toISOString();
+      run.cancellation = { operation_id: randomUUID(), actor: identity.actor, role: identity.role, requested_at,
+        decision: accepted ? 'accepted' : 'already_terminal', grace_deadline_at: accepted && run.attempt_id ? new Date(timestamp + 30_000).toISOString() : null };
+      this.audit(identity.actor, identity.workspace, 'run.cancel-request', run.cancellation.decision, id,
+        { source: 'platform:authorized-cancellation', operation_id: run.cancellation.operation_id, resource_id: run.allocation?.resource_id ?? null, observed_at: requested_at });
+      if (!accepted) return;
+      run.status = 'cancelled'; run.phase = 'terminal'; run.terminal_at = requested_at; run.failure = null;
+      run.stop = { status: run.attempt_id ? 'pending' : 'not_started', observed_at: run.attempt_id ? null : requested_at,
+        source: run.attempt_id ? null : 'platform:no-attempt-intent', forced_at: null };
+      if (!run.allocation) run.cleanup = { status: 'complete', source: 'platform:no-create-intent', observed_at: requested_at };
+    });
+  }
   change(id: string, action: string, update: (run: Run) => void, observation?: { outcome: string; evidence: AuditEvidence }): Run {
     return this.transaction(() => {
       const run = this.get(id)!;
@@ -145,7 +162,7 @@ export class Store {
   }
   private progress(run: Run) {
     return { attempt_id: run.attempt_id, status: run.status, phase: run.phase, failure: run.failure,
-      validation: run.validation?.status ?? null, cleanup: { status: run.cleanup.status, observed_at: run.cleanup.observed_at } };
+      validation: run.validation?.status ?? null, cleanup: { status: run.cleanup.status, observed_at: run.cleanup.observed_at }, cancellation: run.cancellation, stop: run.stop };
   }
   private appendEvent(run: Run, type: RunEvent['type'] = 'run.progress') {
     const sequence = this.eventHead(run.run_id) + 1;

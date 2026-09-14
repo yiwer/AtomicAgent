@@ -6,9 +6,11 @@ import { researchServer, requestedMcp, recordMcpCall, researchSchema, validateRe
 import type { ClaudeRequest, QueryPort } from './claude-execution.js';
 
 // Model output is a candidate only. This controlled runner owns acquisition evidence and file creation.
-export async function runResearch(request: ClaudeRequest, root: string, runQuery: QueryPort) {
+export async function runResearch(request: ClaudeRequest, root: string, runQuery: QueryPort, cancellation?: AbortSignal) {
+ cancellation?.throwIfAborted();
  const binding = request.mcp?.[0] as McpBinding;
  const evidence = binding && requestedMcp(binding), controller = new AbortController();
+ const cancel = () => controller.abort(); cancellation?.addEventListener('abort', cancel, { once: true });
  const remaining = Date.parse(request.deadline_at) - Date.now();
  const timer = setTimeout(() => controller.abort(), Math.max(1, remaining));
  let failed = false, entries = 0;
@@ -34,7 +36,7 @@ export async function runResearch(request: ClaudeRequest, root: string, runQuery
     await persist();
    } catch { failed = true; controller.abort(); throw new TaskError('required_capability_failed'); }
   });
-  const permitted = (name: string, input: Record<string, unknown>) => !failed && evidence.connected === true && evidence.callable === true && name === 'mcp__research__read_source' && service.permitted(input);
+  const permitted = (name: string, input: Record<string, unknown>) => !controller.signal.aborted && !failed && evidence.connected === true && evidence.callable === true && name === 'mcp__research__read_source' && service.permitted(input);
   const deny = async () => {
    try { recordMcpCall(evidence, { authorized: false, invocation_id: randomUUID(), source_id: null, outcome: 'denied', observed_at: new Date().toISOString() }); await persist(); }
    catch { failed = true; controller.abort(); }
@@ -69,5 +71,5 @@ export async function runResearch(request: ClaudeRequest, root: string, runQuery
   throw new TaskError('runtime_failed');
  } catch (error) {
   return { skills: [], failure: failed ? 'required_capability_failed' : controller.signal.aborted ? 'deadline_exceeded' : error instanceof TaskError ? error.code : 'required_capability_failed', mcp: evidence ? [evidence] : [] };
- } finally { clearTimeout(timer); controller.abort(); }
+ } finally { clearTimeout(timer); controller.abort(); cancellation?.removeEventListener('abort', cancel); }
 }

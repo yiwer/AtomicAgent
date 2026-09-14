@@ -29,4 +29,6 @@ export class RoutedSandbox implements SandboxPort {
   }
   execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp) { return this.forRun(run).execute(run, signal, observeSkills, observeMcp); }
   cleanup(run: Run) { return this.forRun(run, 'cleanup').cleanup(run); }
+  async requestStop(run: Run) { await this.forRun(run, 'cleanup').requestStop?.(run); }
+  async forceStop(run: Run) { return await this.forRun(run, 'cleanup').forceStop?.(run) ?? 'unknown' as const; }
 }

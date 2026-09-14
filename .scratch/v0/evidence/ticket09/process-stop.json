@@ -1,0 +1,62 @@
+{
+  "source": "real-local-controlled-node-process",
+  "verified_at": "2026-09-13T23:55:01.590Z",
+  "run_id": "c333bf9b-a0da-4654-9e16-eb24a5ffd959",
+  "owned_pid": 6640,
+  "close_receipt": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "force_after_ms": 30085,
+  "run": {
+    "run_id": "c333bf9b-a0da-4654-9e16-eb24a5ffd959",
+    "status": "cancelled",
+    "phase": "terminal",
+    "failure": null,
+    "accepted_at": "2026-09-13T23:54:31.321Z",
+    "terminal_at": "2026-09-13T23:54:31.392Z",
+    "attempt_id": "2ab7d474-5f48-4a49-9b03-65d6e0847a34",
+    "submission_digest": "aec202d02e1c40a0af390ca1a24bc939471354ab94dc6ab389bd1c5e78818e2b",
+    "cleanup": {
+      "status": "complete",
+      "observed_at": "2026-09-13T23:55:01.489Z",
+      "source": "controlled-local-child-process:node-close-event"
+    },
+    "cancellation": {
+      "operation_id": "47ffec1c-a6a1-41d9-8031-1d9937d26be4",
+      "actor": "process-test",
+      "role": "caller",
+      "requested_at": "2026-09-13T23:54:31.392Z",
+      "decision": "accepted",
+      "grace_deadline_at": "2026-09-13T23:55:01.392Z"
+    },
+    "stop": {
+      "status": "stopped",
+      "forced_at": "2026-09-13T23:55:01.476Z",
+      "observed_at": "2026-09-13T23:55:01.488Z",
+      "source": "controlled-local-child-process:node-close-event",
+      "checks": 1,
+      "retry_at": null
+    },
+    "validation": null,
+    "skills": [],
+    "mcp": [],
+    "inputs": [],
+    "execution": {
+      "mcp": [],
+      "skills": [],
+      "manifest_digest": "17dadd2f2c143b4e590acc69a3ff23760b755c361e7ba12c60267ed4f0f4ea72",
+      "profile": "json-lab@1",
+      "mode": "fixture",
+      "model": "fixture:no-model",
+      "sdk": "0.3.270",
+      "cli": "bundled-with-sdk-0.3.270",
+      "node": "24.18.0",
+      "image": "fixture:no-container",
+      "deadline_at": "2026-09-13T23:55:31.321Z",
+      "output_contract": "summary-value@1"
+    }
+  },
+  "provider_resources_remaining": 0,
+  "scope": "Actual Windows local child exit observed. Provider HTTP deletion separately protocol-tested. No paid model or Linux sandbox qualification."
+}

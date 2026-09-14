@@ -1,7 +1,7 @@
 import { configurationPanel } from './configurations.js';
 import { observeRun } from './events.js';
 const $ = id => document.getElementById(id);
-const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
+const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', cancelled: '已取消', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
 const errorText = { file_expired: '源文件已过期，请选择仍有效的产物。', file_incomplete: '源文件内容不完整，未接纳新任务。请选择其他产物。', input_contract_incompatible: '此产物不符合当前 CSV / 行数组 JSON 统计契约。', file_not_found: '源文件不存在或当前身份无权访问，请重新选择。', configuration_identity_changed: '登录身份已变化；请登录原身份找回配置操作。', configuration_conflict: '配置已被其他操作更新。请打开最新修订并重新预览。', configuration_preview_required: '请重新预览当前配置后再发布。', binding_not_allowed: '所选配置超过服务端登记的允许范围。', configuration_command_conflict: '此操作标识已绑定其他内容，请保留原操作材料核对。', authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', submission_identity_changed: '登录身份已变化，请重新登录原身份后找回提交。', config_unavailable: '登记配置不可用。', idempotency_conflict: '原提交标识已绑定其他内容；已保留恢复材料，请核对原提交。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
 let me = null, selected = null, loading = false, pending = null, selectedInput = null;
 let observation = null;
@@ -22,7 +22,7 @@ async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const data = await response.json();
   if (!response.ok) {
-    if (response.status === 401 || ['submission_identity_changed', 'configuration_identity_changed'].includes(data.error)) loggedOut();
+    if (response.status === 401 || ['submission_identity_changed', 'configuration_identity_changed', 'cancellation_identity_changed'].includes(data.error)) loggedOut();
     throw Object.assign(new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`), { submissionStatus: data.submission_status, commandStatus: data.command_status });
   }
   return data;
@@ -73,6 +73,10 @@ async function renderDetail(id, open = false) {
   fact('回收状态', statusText[run.cleanup.status]); fact('最近核验', run.cleanup.observed_at);
   fact('核验来源', run.cleanup.source); fact('输出校验', run.validation?.status === 'passed' ? `通过 ${run.validation.contract}` : run.validation?.status === 'failed' ? '不合格' : '未完成');
   fact('Attempt', run.attempt_id);
+  const stopText = { pending: '待核验', unknown: '未知', stopped: '已核验停止', not_started: '未启动 Attempt' };
+  $('cancel-facts').textContent = run.cancellation ? `取消裁定：${run.cancellation.decision === 'accepted' ? '已接受' : '已到终态，取消未改变结果'} · 请求 ${run.cancellation.operation_id} · ${run.cancellation.requested_at} · 发起者 ${run.cancellation.actor} · 实际停止：${stopText[run.stop?.status] ?? '无取消停止观测'} · 宽限截止 ${run.cancellation.grace_deadline_at ?? '不适用'} · 强停意图 ${run.stop?.forced_at ?? '无'} · 核验 ${run.stop?.observed_at ?? '尚无'} · 来源 ${run.stop?.source ?? '未知'} · 独立回收：${statusText[run.cleanup.status]}` : '尚未请求取消。取消接受后仍需核验实际停止和独立回收。执行中取消有 30 秒宽限。';
+  $('cancel-run').textContent = run.cancellation ? '核对取消请求' : '取消任务';
+  $('cancel-run').hidden = !!run.terminal_at && !run.cancellation;
   $('result').textContent = result ? JSON.stringify(result.result, null, 2) : '尚无已提交结果';
   $('input-bindings').replaceChildren();
   for (const binding of run.inputs) {
@@ -207,6 +211,17 @@ $('upload-input').addEventListener('click', async () => {
 $('refresh').addEventListener('click', refresh);
 $('logout').addEventListener('click', async () => { try { await api('/auth/logout', { method: 'POST' }); location.hash = ''; loggedOut(); } catch (e) { showError(e); } });
 $('close-detail').addEventListener('click', () => $('detail').close());
+$('cancel-run').addEventListener('click', async () => {
+  const identity = me, id = selected;
+  if (!identity || !id) return;
+  $('cancel-run').disabled = true; $('cancel-error').textContent = '';
+  try {
+    await api(`/v1/runs/${id}:cancel`, { method: 'POST', headers: { 'X-Cancellation-Actor': identity.actor, 'X-Cancellation-Workspace': identity.workspace }, body: '{}' });
+    if (me === identity && selected === id) await renderDetail(id);
+  } catch (error) {
+    if (me === identity && selected === id) $('cancel-error').textContent = `取消结果待确认。${error.message} 可重复请求同一任务，或刷新核对取消裁定。`;
+  } finally { $('cancel-run').disabled = false; }
+});
 $('detail').addEventListener('close', () => { stopObservation(); selected = null; history.replaceState(null, '', location.pathname); });
 window.addEventListener('pagehide', stopObservation);
 setInterval(() => { if (!document.hidden) void refresh(); }, 2000);

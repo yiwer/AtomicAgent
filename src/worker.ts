@@ -7,12 +7,13 @@ import { Store } from './store.js';
 import { Files } from './files.js';
 import { validateFiles } from './file-validator.js';
 import type { StoredObject } from './domain.js';
+import { Cancellation } from './cancellation.js';
 const validates = new Ajv({ strict: true }).compile(outputSchema);
 async function beforeDeadline<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) { void operation.catch(() => {}); throw new TaskError('deadline_exceeded'); }
+  if (signal.aborted) { void operation.catch(() => {}); throw signal.reason instanceof TaskError ? signal.reason : new TaskError('deadline_exceeded'); }
   let abort!: () => void;
   const deadline = new Promise<never>((_, reject) => {
-    abort = () => reject(new TaskError('deadline_exceeded'));
+    abort = () => reject(signal.reason instanceof TaskError ? signal.reason : new TaskError('deadline_exceeded'));
     signal.addEventListener('abort', abort, { once: true });
   });
   try { return await Promise.race([operation, deadline]); }
@@ -21,31 +22,43 @@ async function beforeDeadline<T>(operation: Promise<T>, signal: AbortSignal): Pr
 export class Worker {
   private active: Promise<void> | null = null;
   private stopping = false;
-  constructor(private store: Store, private sandbox: SandboxPort, private files: Files) {}
+  private closed = false;
+  private recordFailure = false;
+  private controllers = new Map<string, AbortController>();
+  private cancellation: Cancellation;
+  constructor(private store: Store, private sandbox: SandboxPort, private files: Files, cancellationClock?: () => number) {
+    this.cancellation = new Cancellation(store, sandbox, run => this.cleanup(run), () => this.wake(), cancellationClock);
+  }
+  cancel(id: string) { if (this.store.get(id)?.cancellation?.decision === 'accepted') this.controllers.get(id)?.abort(); this.cancellation.wake(); }
+  cancelRecordFailure(run: Run) { this.recordFailure = true; this.controllers.get(run.run_id)?.abort(new TaskError('execution_lost')); this.cancellation.recordFailure(run); }
+  get acceptingWork() { return !this.recordFailure; }
   async recover() {
     let recordFailure = false;
     for (const run of this.store.all()) {
       try { if (run.status === 'running') this.finish(run.run_id, 'execution_lost'); }
       catch { recordFailure = true; }
       // Already-read immutable identities remain usable for disposal when a business or audit write fails.
-      try { if (run.status !== 'queued' && run.cleanup.status !== 'complete') await this.cleanup(run); }
+      try { if (run.status !== 'queued' && run.cleanup.status !== 'complete' && run.cancellation?.decision !== 'accepted') await this.cleanup(run); }
       catch { recordFailure = true; }
     }
     if (recordFailure) throw new Error('recovery_record_unavailable');
+    this.cancellation.wake();
   }
   wake() {
-    if (this.active || this.stopping) return;
+    if (this.active || this.stopping || this.recordFailure) return;
     this.active = this.drain().catch(() => { /* No raw error payload at an observation exit. Durable running intent is recovered on restart. */ })
       .finally(() => { this.active = null; });
   }
   private async drain() {
-    while (!this.stopping) {
+    while (!this.stopping && !this.recordFailure) {
+      if (this.store.all().some(r => r.cancellation?.decision === 'accepted' && r.attempt_id && r.stop?.status !== 'stopped')) return;
       const run = this.store.all().reverse().find(r => r.status === 'queued');
       if (!run) return;
       await this.execute(run);
     }
   }
   private finish(id: string, failure: Failure | null, result?: unknown, artifacts: StoredObject[] = []) {
+    if (this.store.get(id)?.terminal_at) return;
     this.store.change(id, failure ? 'run.fail' : 'result.commit', run => {
       if (run.terminal_at) return;
       run.failure = failure;
@@ -62,29 +75,52 @@ export class Worker {
     const left = Date.parse(queued.manifest.deadline_at) - Date.now();
     if (left <= 0) { try { this.finish(queued.run_id, 'deadline_exceeded'); } finally { await this.cleanup(latest); } return; }
     const controller = new AbortController();
+    this.controllers.set(queued.run_id, controller);
     const timer = setTimeout(() => controller.abort(), left);
     try {
       const run = this.store.change(queued.run_id, 'sandbox.create-intent', r => {
         if (r.status !== 'queued') throw new TaskError('execution_lost');
         r.status = 'running'; r.phase = 'preparing';
-        r.allocation = { operation_id: randomUUID(), resource_id: null };
+        r.allocation = { operation_id: randomUUID(), resource_id: null, creation_pending: true };
       });
       latest = run;
-      const resource = await beforeDeadline(this.sandbox.prepare(run), controller.signal);
-      latest = { ...run, allocation: { ...run.allocation!, resource_id: resource } };
-      const prepared = this.store.change(run.run_id, 'sandbox.prepared', r => { r.allocation!.resource_id = resource; });
+      const preparation = this.sandbox.prepare(run).then(async resource => {
+        latest = { ...run, allocation: { ...run.allocation!, resource_id: resource, creation_pending: false } };
+        if (!this.closed) {
+          try { this.store.change(run.run_id, 'sandbox.create-receipt', r => { r.allocation!.resource_id = resource; r.allocation!.creation_pending = false; }); }
+          finally { if (this.store.get(run.run_id)?.terminal_at) await this.cleanup(latest); }
+        } else await this.sandbox.cleanup(latest);
+        return resource;
+      }, error => {
+        latest = { ...run, allocation: { ...run.allocation!, creation_pending: false } };
+        if (!this.closed) this.store.change(run.run_id, 'sandbox.create-returned', r => { r.allocation!.creation_pending = false; });
+        throw error;
+      });
+      const resource = await beforeDeadline(preparation, controller.signal);
+      latest = { ...run, allocation: { ...run.allocation!, resource_id: resource, creation_pending: false } };
+      const prepared = this.store.change(run.run_id, 'sandbox.prepared', r => { if (r.terminal_at) throw new TaskError('execution_lost'); r.allocation!.resource_id = resource; });
       if (controller.signal.aborted || Date.now() >= Date.parse(queued.manifest.deadline_at)) throw new TaskError('deadline_exceeded');
       const inputs = await beforeDeadline(this.files.load(prepared), controller.signal);
       if (inputs.length) {
         if (!this.sandbox.loadInputs) throw new TaskError('provisioning_failed');
-        try { await beforeDeadline(this.sandbox.loadInputs(prepared, inputs), controller.signal); }
+        try {
+          latest = this.store.change(run.run_id, 'input.copy-intent', r => { if (r.terminal_at) throw new TaskError('execution_lost'); r.allocation!.input_copy_pending = true; });
+          const copy = this.sandbox.loadInputs(prepared, inputs).finally(async () => {
+            latest = { ...latest, allocation: { ...latest.allocation!, input_copy_pending: false } };
+            if (!this.closed) {
+              try { this.store.change(run.run_id, 'input.copy-returned', r => { r.allocation!.input_copy_pending = false; }); }
+              finally { if (this.store.get(run.run_id)?.terminal_at) await this.cleanup(latest); }
+            } else await this.sandbox.cleanup(latest);
+          });
+          await beforeDeadline(copy, controller.signal);
+        }
         catch (error) { if (inputs.some(i => i.binding.source) && !(error instanceof TaskError && error.code === 'deadline_exceeded')) throw new TaskError('input_copy_failed'); throw error; }
         await beforeDeadline(this.files.confirmCopies(prepared), controller.signal);
-        this.store.change(prepared.run_id, 'input.loaded', r => { for (const binding of r.manifest.grant.inputs) { binding.loaded = true; binding.loaded_at = now(); } });
+        this.store.change(prepared.run_id, 'input.loaded', r => { if (r.terminal_at) throw new TaskError('execution_lost'); for (const binding of r.manifest.grant.inputs) { binding.loaded = true; binding.loaded_at = now(); } });
       }
       phase = 'executing';
       const executing = this.store.change(prepared.run_id, 'attempt.start-intent', r => {
-        if (r.attempt_id) throw new TaskError('execution_lost');
+        if (r.attempt_id || r.terminal_at) throw new TaskError('execution_lost');
         r.attempt_id = randomUUID(); r.phase = 'executing';
         for (const e of r.skills ?? []) e.attempt_id = r.attempt_id;
       });
@@ -137,18 +173,19 @@ export class Worker {
       phase = 'committing';
       this.finish(run.run_id, null, candidate, staged);
     } catch (error) {
-      const failure = controller.signal.aborted ? 'deadline_exceeded' : error instanceof TaskError ? error.code :
+      const failure = controller.signal.aborted ? (controller.signal.reason instanceof TaskError ? controller.signal.reason.code : 'deadline_exceeded') : error instanceof TaskError ? error.code :
         phase === 'preparing' ? 'provisioning_failed' : phase === 'committing' ? 'artifact_commit_failed' : 'runtime_failed';
       this.finish(queued.run_id, failure);
     } finally {
       clearTimeout(timer);
+      this.controllers.delete(queued.run_id);
       try { if (this.store.get(queued.run_id)?.status !== 'succeeded') for (const object of staged) await this.files.discard(object); }
-      finally { await this.cleanup(latest); }
+      finally { if (this.store.get(queued.run_id)?.cancellation?.decision === 'accepted' || this.recordFailure) this.cancellation.wake(); else await this.cleanup(latest); }
     }
   }
   private async cleanup(run: Run) {
     let status: Run['cleanup']['status'] = 'unknown';
-    try { status = !run.allocation || await this.sandbox.cleanup(run) === 'absent' ? 'complete' : 'unknown'; }
+    try { status = !run.allocation || await this.sandbox.cleanup(run) === 'absent' ? 'complete' : 'unknown'; if (run.allocation?.creation_pending || run.allocation?.input_copy_pending) status = 'unknown'; }
     catch { status = 'failed'; }
     const observedAt = now();
     const source = run.allocation ? (this.sandbox.sourceFor?.(run) ?? this.sandbox.source) : 'platform:no-create-intent';
@@ -157,5 +194,5 @@ export class Worker {
     }, { outcome: status, evidence: { source, observed_at: observedAt,
       resource_id: run.allocation?.resource_id ?? null, operation_id: run.allocation?.operation_id ?? null } });
   }
-  async close() { this.stopping = true; await this.active; }
+  async close() { this.stopping = true; await this.active; await this.cancellation.close(); this.closed = true; }
 }

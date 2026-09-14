@@ -39,3 +39,18 @@ test('an empty provider listing cannot close an unknown create operation', async
   const adapter = new OpenSandboxAdapter({ domain: `http://127.0.0.1:${address.port}`, apiKey: 'test-only-key' }, () => 'not-used');
   assert.equal(await adapter.cleanup({ run_id: 'run', allocation: { resource_id: null, operation_id: 'op' } } as Run), 'unknown');
 });
+test('forced stop uses provider deletion plus a fresh resource observation and preserves uncertainty', async t => {
+  let present=true; const calls: string[]=[];
+  const server=createServer((req,res)=>{calls.push(`${req.method} ${req.url}`); if(req.method==='DELETE'){res.writeHead(204);res.end();return;} res.writeHead(present?200:404,{'Content-Type':'application/json'});res.end(JSON.stringify(present?{id:'owned',image:{uri:'test'},entrypoint:['tail'],status:{state:'Running'},createdAt:new Date().toISOString(),expiresAt:null}:{code:'not_found',message:'gone'}));});
+  await new Promise<void>(r=>server.listen(0,'127.0.0.1',r)); t.after(()=>new Promise<void>(r=>server.close(()=>r())));
+  const address=server.address(); if(!address||typeof address==='string') throw new Error('address');
+  const adapter=new OpenSandboxAdapter({domain:`http://127.0.0.1:${address.port}`,apiKey:'test'},()=> 'unused');
+  const run={allocation:{resource_id:'owned',operation_id:'op'}} as Run;
+  assert.equal(await adapter.forceStop(run),'unknown'); present=false; assert.equal(await adapter.forceStop(run),'stopped');
+  assert.deepEqual(calls,['DELETE /v1/sandboxes/owned','GET /v1/sandboxes/owned','DELETE /v1/sandboxes/owned','GET /v1/sandboxes/owned']);
+});
+test('an already cancelled execution cannot connect or start a new command',async()=>{
+  const adapter=new OpenSandboxAdapter({domain:'http://127.0.0.1:1',apiKey:'test'},()=> 'unused');
+  const controller=new AbortController();controller.abort(new Error('cancelled-before-dispatch'));
+  await assert.rejects(adapter.execute({} as Run,controller.signal),/cancelled-before-dispatch/);
+});

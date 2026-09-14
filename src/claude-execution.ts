@@ -11,10 +11,13 @@ import { requestedSkills, verifySkill, type SkillBinding } from './skills.js';
 export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[] }
 export type QueryPort = (input: Parameters<typeof query>[0]) => AsyncIterable<SDKMessage>;
 // Public engine boundary. The caller supplies an isolated task root; production uses /workspace only.
-export async function runClaude(request: ClaudeRequest, root: string, runQuery: QueryPort = query) {
-  if (request.output_contract === 'research-report@1') return runResearch(request, root, runQuery);
+export async function runClaude(request: ClaudeRequest, root: string, runQuery: QueryPort = query, cancellation?: AbortSignal) {
+  cancellation?.throwIfAborted();
+  if (request.output_contract === 'research-report@1') return runResearch(request, root, runQuery, cancellation);
   const selected = request.skills ?? [], evidence = requestedSkills(selected);
   const controller = new AbortController(), remaining = Date.parse(request.deadline_at) - Date.now();
+  const cancel = () => controller.abort();
+  cancellation?.addEventListener('abort', cancel, { once: true });
   const fileTask = request.output_contract === 'data-statistics@1';
   const command = 'node /opt/atomicagent/dist/src/process-data.js';
   const pluginPath = join(root, 'registered-skills');
@@ -33,7 +36,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
   };
   const skillFor = (name: string, input: Record<string, unknown>) => name === 'Skill' && typeof input.skill === 'string' &&
     Object.keys(input).every(k => k === 'skill') ? selected.find(s => s.entry === input.skill) : undefined;
-  const permitted = (name: string, input: Record<string, unknown>) => !evidenceFailed && !capabilityFailed && initialized && (Boolean(skillFor(name, input)) ||
+  const permitted = (name: string, input: Record<string, unknown>) => !controller.signal.aborted && !evidenceFailed && !capabilityFailed && initialized && (Boolean(skillFor(name, input)) ||
     (fileTask && name === 'Bash' && input.command === command && !input.run_in_background && Object.keys(input).every(k => ['command', 'description', 'timeout', 'run_in_background'].includes(k))));
   const timer = setTimeout(() => controller.abort(), Math.max(1, remaining));
   try {
@@ -50,6 +53,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
       }
       await persist();
     }
+    cancellation?.throwIfAborted();
     const messages = runQuery({ prompt: `Task request:\n${request.prompt}`, options: {
       model: request.model, cwd: root, tools: [...(fileTask ? ['Bash'] : []), ...(selected.length ? ['Skill'] : [])], mcpServers: {}, settingSources: [],
       skills: selected.map(s => s.entry), plugins: selected.length ? [{ type: 'local', path: pluginPath }] : [],
@@ -125,5 +129,5 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
   } catch (error) {
     for (const e of evidence) { e.attempt_id = request.attempt_id; e.observed_at ??= new Date().toISOString(); e.source = 'controlled-runner:skill-evidence'; }
     return { failure: evidenceFailed || capabilityFailed ? 'required_capability_failed' : controller.signal.aborted ? 'deadline_exceeded' : error instanceof TaskError ? error.code : initialized ? 'runtime_failed' : 'required_capability_failed', skills: evidence };
-  } finally { clearTimeout(timer); controller.abort(); }
+  } finally { clearTimeout(timer); controller.abort(); cancellation?.removeEventListener('abort', cancel); }
 }
