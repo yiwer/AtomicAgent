@@ -2,11 +2,14 @@
 """Single-node fixture deployment. Installed root-owned, never replaced by CI."""
 import fcntl
 import hashlib
+import gzip
+import io
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -20,26 +23,50 @@ NAME = 'atomicagent-app'
 BASE = ROOT / 'dependency-base.json'
 
 
+def release_bytes(stream):
+    def timed_out(_signal, _frame):
+        raise TimeoutError('Release receive deadline exceeded')
+    previous = signal.signal(signal.SIGALRM, timed_out)
+    signal.alarm(300)
+    try:
+        compressed = stream.read(6 * 1024 * 1024 + 1)
+        if len(compressed) > 6 * 1024 * 1024:
+            raise RuntimeError('Compressed release exceeds limit')
+        with gzip.GzipFile(fileobj=io.BytesIO(compressed)) as archive:
+            raw = archive.read(5 * 1024 * 1024 + 1)
+        if len(raw) > 5 * 1024 * 1024:
+            raise RuntimeError('Decompressed release exceeds 5 MiB limit')
+        return raw
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
 def read_release(stream, directory):
     """Extract only regular app files, never archive paths/links outside this build context."""
     total = 0
     seen = set()
-    with tarfile.open(fileobj=stream, mode='r|gz') as archive:
+    # Bound the whole tar before parsing PAX/GNU metadata, not just yielded file bodies.
+    with tarfile.open(fileobj=io.BytesIO(release_bytes(stream)), mode='r:') as archive:
         for member in archive:
             name = member.name.rstrip('/')
+            if len(name) > 512:
+                raise RuntimeError('Release member name too long')
             parts = Path(name).parts
             if not parts or any(p in ('.', '..') for p in parts) or Path(name).is_absolute():
                 raise RuntimeError('Unsafe release path')
             allowed = name in ('package.json', 'package-lock.json', 'deploy/cloud-check.mjs', 'deploy/Dockerfile.app') or name.startswith(('dist/src/', 'dist/scripts/', 'web/'))
-            if member.isdir() and name in ('dist/src', 'dist/scripts', 'web', 'deploy'):
-                continue
-            if member.isdir() and allowed:
-                continue
-            if not member.isfile() or not allowed or name in seen:
-                raise RuntimeError('Unexpected release member')
+            if name in seen:
+                raise RuntimeError('Duplicate release member')
             seen.add(name)
             if len(seen) > 1024:
-                raise RuntimeError('Too many release files')
+                raise RuntimeError('Too many release members')
+            if member.isdir():
+                if member.size != 0 or not (allowed or name in ('dist/src', 'dist/scripts', 'web', 'deploy')):
+                    raise RuntimeError('Unexpected release directory')
+                continue
+            if not member.isfile() or not allowed:
+                raise RuntimeError('Unexpected release member')
             total += member.size
             if member.size < 0 or total > 5 * 1024 * 1024:
                 raise RuntimeError('Release exceeds 5 MiB limit')

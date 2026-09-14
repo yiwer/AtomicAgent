@@ -14,7 +14,7 @@
 
 [工作流](../.github/workflows/deploy.yml) 在 main push、main PR 和手动触发时执行类型检查、单元测试、Linux Guardian 测试、构建与浏览器测试。只有 main 的非 PR 运行可以进入 `production` 环境发布；Actions 固定 commit，Docker Node 基础镜像固定 digest。
 
-每个镜像以完整 Git SHA 标记。CI 先读取云端已通过发布检查的依赖镜像记录；`package.json`、`package-lock.json` 和 `deploy/Dockerfile.app` 的 SHA256 全部相同，才传输已测试的编译产物／Web 文件（当前压缩后约 115 KiB）。服务器再次验证三份摘要，拒绝路径越界、链接、重复成员、超过 1024 个文件或 5 MiB 的解压内容，并用管理员固定配方、精确镜像 ID 离线构建新镜像；不执行上传的 Dockerfile。每次都从完整依赖镜像构建，避免层数不断累积。
+每个镜像以完整 Git SHA 标记。CI 先读取云端已通过发布检查的依赖镜像记录；`package.json`、`package-lock.json` 和 `deploy/Dockerfile.app` 的 SHA256 全部相同，才传输已测试的编译产物／Web 文件（当前压缩后约 115 KiB）。服务器再次验证三份摘要，接收最多 5 分钟，压缩输入最多 6 MiB；在 tar 解析前限制包含 PAX／目录元数据的全部解压内容不超过 5 MiB，拒绝路径越界、链接、重复成员及超过 1024 个成员。随后用管理员固定配方、精确镜像 ID 离线构建新镜像，不执行上传的 Dockerfile。每次都从完整依赖镜像构建，避免层数不断累积。
 
 依赖或基础配方变化时，CI 自动构建并传输完整的 digest-pinned 镜像，通过鉴权／fixture 检查后更新依赖记录。完整镜像导入窗口为 20 分钟，发布 job 最长 25 分钟。跨境网络较慢时，依赖变更的完整传输仍可能失败；失败发生在切换前时旧服务继续运行，可重跑。普通应用更新不再重复传数百 MiB 的依赖。
 

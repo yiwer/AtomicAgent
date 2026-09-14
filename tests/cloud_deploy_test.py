@@ -43,13 +43,27 @@ def bundle(extra=None):
             member = tarfile.TarInfo(name)
             member.size = len(content)
             archive.addfile(member, io.BytesIO(content))
-        if extra is not None:
-            archive.addfile(extra, io.BytesIO(b'x' * extra.size))
+        for member in extra if isinstance(extra, list) else ([] if extra is None else [extra]):
+            archive.addfile(member, io.BytesIO(b'x' * member.size))
     stream.seek(0)
     return stream
 
 
 class DeploymentRelease(unittest.TestCase):
+    def test_pax_metadata_counts_toward_the_decompressed_limit(self):
+        member = tarfile.TarInfo('web/metadata')
+        member.pax_headers = {'comment': 'x' * (6 * 1024 * 1024)}
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(RuntimeError, 'Decompressed release'):
+                deployment.read_release(bundle(member), Path(temporary))
+
+    def test_duplicate_directories_are_rejected_too(self):
+        member = tarfile.TarInfo('web/directory')
+        member.type = tarfile.DIRTYPE
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(RuntimeError, 'Duplicate release'):
+                deployment.read_release(bundle([member, member]), Path(temporary))
+
     def test_regular_application_files_are_readable_by_nonroot_runtime(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
