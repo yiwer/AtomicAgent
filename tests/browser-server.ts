@@ -5,10 +5,15 @@ import { createApp } from '../src/app.js';
 import { fixtureProfile } from '../src/profile.js';
 import { FixtureSandbox } from '../src/fixture-sandbox.js';
 import { RoutedSandbox } from '../src/profile-routing.js';
+import { randomUUID } from 'node:crypto';
+import type { SandboxPort } from '../src/domain.js';
 const directory = await mkdtemp(join(tmpdir(), 'atomicagent-browser-'));
-const sandbox = new FixtureSandbox();
+const sandbox: SandboxPort = new FixtureSandbox();
 const execute = sandbox.execute.bind(sandbox);
-sandbox.execute = async (run, signal, observeSkills, observeMcp) => { await new Promise(resolve => setTimeout(resolve, 2000)); return execute(run, signal, observeSkills, observeMcp); };
+sandbox.execute = async (run, signal, observeSkills, observeMcp, boundary) => {
+ if(run.prompt==='boundary-denial-fixture') boundary?.({run_id:run.run_id,attempt_id:run.attempt_id!,source:'controlled-runner:namespace-and-gateway',observed_at:new Date().toISOString(),isolation:'unknown',audit_coverage:'partial',calls:[{invocation_id:randomUUID(),boundary:'tool',outcome:'denied',observed_at:new Date().toISOString()}]});
+ await new Promise(resolve => setTimeout(resolve, 2000)); return execute(run, signal, observeSkills, observeMcp);
+};
 // A catalog-only live-mode fixture verifies the pre-submit warning. Its adapter fails closed: no network/model execution.
 const livePreview = { ...fixtureProfile, id: 'browser-live-preview@1', mode: 'opensandbox' as const,
   image: `test/runner@sha256:${'1'.repeat(64)}`, model: 'preview-only-model', endpoint: 'https://model.example.com',

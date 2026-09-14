@@ -18,7 +18,7 @@ export async function runResearch(request: ClaudeRequest, root: string, runQuery
  const persist = async () => {
   if (++entries > 16) throw new TaskError('required_capability_failed');
   evidence.observed_at = new Date().toISOString(); evidence.source = 'controlled-runner:mcp'; evidence.run_id = request.run_id; evidence.attempt_id = request.attempt_id;
-  const journal = await open(join(root, 'mcp-evidence.jsonl'), 'a', 0o600);
+  const journal = await open(join(request.evidence_root ?? root, 'mcp-evidence.jsonl'), 'a', 0o600);
   try { await journal.writeFile(JSON.stringify({ run_id: request.run_id, attempt_id: request.attempt_id, mcp: [evidence] }) + '\n'); await journal.sync(); }
   catch { failed = true; controller.abort(); throw new TaskError('required_capability_failed'); }
   finally { await journal.close(); }
@@ -34,10 +34,12 @@ export async function runResearch(request: ClaudeRequest, root: string, runQuery
     if (event === 'denied') evidence.authorized = false;
     if (receipt) { evidence.authorized = true; evidence.acquired++; evidence.usage.bytes = (evidence.usage.bytes ?? 0) + Buffer.byteLength(receipt.text); }
     await persist();
+    if(event==='intent') await request.authorizeAction?.('mcp');
    } catch { failed = true; controller.abort(); throw new TaskError('required_capability_failed'); }
   });
   const permitted = (name: string, input: Record<string, unknown>) => !controller.signal.aborted && !failed && evidence.connected === true && evidence.callable === true && name === 'mcp__research__read_source' && service.permitted(input);
   const deny = async () => {
+   await request.onDenied?.();
    try { recordMcpCall(evidence, { authorized: false, invocation_id: randomUUID(), source_id: null, outcome: 'denied', observed_at: new Date().toISOString() }); await persist(); }
    catch { failed = true; controller.abort(); }
   };

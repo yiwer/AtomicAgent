@@ -8,7 +8,7 @@ import { fileSchema } from './file-contract.js';
 import { collectFiles } from './sandbox-files.js';
 import { requestedSkills, verifySkill, type SkillBinding } from './skills.js';
 
-export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[] }
+export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[]; evidence_root?: string; onDenied?: () => Promise<void>; authorizeAction?: (boundary:'tool'|'mcp')=>Promise<void> }
 export type QueryPort = (input: Parameters<typeof query>[0]) => AsyncIterable<SDKMessage>;
 // Public engine boundary. The caller supplies an isolated task root; production uses /workspace only.
 export async function runClaude(request: ClaudeRequest, root: string, runQuery: QueryPort = query, cancellation?: AbortSignal) {
@@ -30,7 +30,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
     if (++journalEntries > 40) throw new TaskError('required_capability_failed');
     for (const e of evidence) { e.attempt_id = request.attempt_id; e.observed_at = new Date().toISOString(); e.source = 'controlled-runner:skill-evidence'; }
     // A bounded fsync journal precedes permission grants; failure stops the tool. API imports only allowlisted fields.
-    const file = await open(join(root, 'skill-evidence.jsonl'), 'a', 0o600);
+    const file = await open(join(request.evidence_root ?? root, 'skill-evidence.jsonl'), 'a', 0o600);
     try { await file.writeFile(JSON.stringify({ run_id: request.run_id, attempt_id: request.attempt_id, skills: evidence }) + '\n'); await file.sync(); }
     finally { await file.close(); }
   };
@@ -44,10 +44,10 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
     if (selected.length) {
       selected.forEach(verifySkill);
       await mkdir(pluginPath); await mkdir(join(pluginPath, '.claude-plugin'));
-      await writeFile(join(pluginPath, '.claude-plugin/plugin.json'), JSON.stringify({ name: 'atomic-registered', version: '1.0.0' }), { flag: 'wx', mode: 0o400 });
+      await writeFile(join(pluginPath, '.claude-plugin/plugin.json'), JSON.stringify({ name: 'atomic-registered', version: '1.0.0' }), { flag: 'wx', mode: 0o444 });
       for (const s of selected) {
         const directory = join(pluginPath, 'skills', s.entry.split(':')[1]!); await mkdir(directory, { recursive: true });
-        const path = join(directory, 'SKILL.md'); await writeFile(path, s.markdown, { flag: 'wx', mode: 0o400 });
+        const path = join(directory, 'SKILL.md'); await writeFile(path, s.markdown, { flag: 'wx', mode: 0o444 });
         if (await readFile(path, 'utf8') !== s.markdown) throw new TaskError('required_capability_failed');
         evidence.find(e => e.id === s.id)!.materialized = true;
       }
@@ -58,11 +58,13 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
       model: request.model, cwd: root, tools: [...(fileTask ? ['Bash'] : []), ...(selected.length ? ['Skill'] : [])], mcpServers: {}, settingSources: [],
       skills: selected.map(s => s.entry), plugins: selected.length ? [{ type: 'local', path: pluginPath }] : [],
       permissionMode: fileTask || selected.length ? 'default' : 'dontAsk',
-      canUseTool: async (name, input) => permitted(name, input) ? { behavior: 'allow', updatedInput: name === 'Bash' ? { command, timeout: Math.min(remaining, 120_000) } : input } : { behavior: 'deny', message: 'authorization_required' },
+      canUseTool: async (name, input) => { if (permitted(name, input)) return { behavior: 'allow', updatedInput: name === 'Bash' ? { command, timeout: Math.min(remaining, 120_000) } : input }; await request.onDenied?.(); return { behavior: 'deny', message: 'authorization_required' }; },
       hooks: {
         PreToolUse: [{ hooks: [async input => {
           if (input.hook_event_name !== 'PreToolUse') return {};
           let allowed = permitted(input.tool_name, input.tool_input as Record<string, unknown>);
+          if(allowed) { try { await request.authorizeAction?.('tool'); } catch { allowed=false; controller.abort(); } }
+          if (!allowed) await request.onDenied?.();
           const s = skillFor(input.tool_name, input.tool_input as Record<string, unknown>);
           if (s && allowed) {
             if (started.has(s.id)) allowed = false;

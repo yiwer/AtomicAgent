@@ -8,6 +8,7 @@ import { Files } from './files.js';
 import { validateFiles } from './file-validator.js';
 import type { StoredObject } from './domain.js';
 import { Cancellation } from './cancellation.js';
+import { validateBoundary, type ObserveBoundary } from './execution-boundary.js';
 const validates = new Ajv({ strict: true }).compile(outputSchema);
 async function beforeDeadline<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) { void operation.catch(() => {}); throw signal.reason instanceof TaskError ? signal.reason : new TaskError('deadline_exceeded'); }
@@ -141,7 +142,20 @@ export class Worker {
         const old = r.mcp?.find(m => m.id === e.id)?.calls.find(c => c.invocation_id === call.invocation_id);
         if (old?.outcome !== call.outcome) this.store.audit('platform', r.workspace, 'mcp.call-observed', call.outcome, r.run_id, { source: e.source, resource_id: `mcp:${e.id}@${e.version}/${call.source_id ?? 'denied-tool'}`, operation_id: call.invocation_id, observed_at: call.observed_at });
       } r.mcp = checked; }); };
-      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp), controller.signal);
+      const observeBoundary: ObserveBoundary = value => {
+        const checked = validateBoundary(executing, value);
+        this.store.change(executing.run_id, 'boundary.observed', r => {
+          if (r.terminal_at || r.attempt_id !== executing.attempt_id) throw new TaskError('execution_lost');
+          const previous = r.boundary?.calls ?? [];
+          const added = checked.calls.filter(call=>!previous.some(old=>old.invocation_id===call.invocation_id && old.outcome===call.outcome));
+          if(previous.length+added.length>128)throw new TaskError('policy_denied');
+          for (const call of added)
+            this.store.audit('platform',r.workspace,call.outcome==='started'?'boundary.action-admit':'boundary.call',call.outcome==='started'?'admitted':call.outcome,r.run_id,{ source:checked.source,operation_id:call.invocation_id,resource_id:call.boundary,observed_at:call.observed_at });
+          r.boundary = { ...(r.boundary && r.boundary.observed_at>checked.observed_at ? r.boundary:checked),calls:[...previous,...added] };
+        });
+      };
+      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp, observeBoundary), controller.signal);
+      if (this.store.get(executing.run_id)?.boundary?.calls.some(c=>c.outcome==='denied')) throw new TaskError('policy_denied');
       const skillEvidence = this.store.get(executing.run_id)!.skills ?? [];
       for (const s of executing.manifest.skills ?? []) {
         const e = skillEvidence.find(e => e.id === s.id && e.version === s.version);

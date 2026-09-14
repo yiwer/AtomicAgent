@@ -1,0 +1,27 @@
+--- a/server/opensandbox_server/services/docker/docker_service.py
++++ b/server/opensandbox_server/services/docker/docker_service.py
+@@ -916,8 +916,11 @@
+             # by Docker's default AppArmor profile.
+             if (request.extensions or {}).get(BOOTSTRAP_EXECD_ISOLATION_KEY) == "enable":
+                 cap_add = set(host_config_kwargs.get("cap_add") or [])
+-                cap_add.add("SYS_ADMIN")
++                cap_add.update({"SYS_ADMIN", "NET_ADMIN"})
+                 host_config_kwargs["cap_add"] = sorted(cap_add)
++                # AtomicAgent trusted bootstrap creates a private network namespace before setpriv.
++                cap_drop = set(host_config_kwargs.get("cap_drop") or [])
++                host_config_kwargs["cap_drop"] = sorted(cap_drop - {"SYS_ADMIN", "NET_ADMIN"})
+                 security_opt = list(host_config_kwargs.get("security_opt") or [])
+                 security_opt = [s for s in security_opt if not s.startswith(("apparmor=", "seccomp="))]
+                 security_opt.append("apparmor=unconfined")
+--- a/server/opensandbox_server/services/docker/port_allocator.py
++++ b/server/opensandbox_server/services/docker/port_allocator.py
+@@ -26,1 +26,1 @@
+-DOCKER_PUBLISH_HOST = "0.0.0.0"
++DOCKER_PUBLISH_HOST = "127.0.0.1"
+--- a/server/opensandbox_server/services/docker/networking.py
++++ b/server/opensandbox_server/services/docker/networking.py
+@@ -475,2 +475,2 @@
+-            "44772": ("0.0.0.0", host_execd_port),
+-            "8080": ("0.0.0.0", host_http_port),
++            "44772": ("127.0.0.1", host_execd_port),
++            "8080": ("127.0.0.1", host_http_port),

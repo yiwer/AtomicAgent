@@ -7,6 +7,7 @@ import { TaskError, type FileCandidate } from './domain.js';
 
 export async function readSandboxFile(root: string, relative: string, limit: number): Promise<Buffer> {
   const base = resolve(root); const path = resolve(root, relative);
+  if ((await lstat(base)).isSymbolicLink() || /[\\:\x00]/.test(relative)) throw new TaskError('output_invalid');
   if (!path.startsWith(base + sep)) throw new TaskError('output_invalid');
   let current = base;
   for (const component of relative.split('/')) {
@@ -15,7 +16,7 @@ export async function readSandboxFile(root: string, relative: string, limit: num
     if (info.isSymbolicLink()) throw new TaskError('output_invalid');
   }
   const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-  try { return await readBounded(file, limit);
+  try { if ((await file.stat()).nlink !== 1) throw new TaskError('output_invalid'); return await readBounded(file, limit);
   } finally { await file.close(); }
 }
 export async function collectFiles(root: string, candidate: unknown): Promise<FileCandidate> {

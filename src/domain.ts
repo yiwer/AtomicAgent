@@ -1,6 +1,7 @@
 import type { McpBinding, McpEvidence, ResearchResult, researchSchema, ObserveMcp } from './research.js';
 import type { SkillBinding, SkillEvidence, ObserveSkills } from './skills.js';
 import type { fileSchema } from './file-contract.js';
+import type { BoundaryEvidence, ObserveBoundary } from './execution-boundary.js';
 export type Role = 'caller' | 'maintainer' | 'health';
 export interface Identity { token: string; actor: string; workspace: string; role: Role }
 export interface Profile {
@@ -8,6 +9,7 @@ export interface Profile {
   node: string; sdk: string; cli: string; model: string; endpoint: string;
   secret_ref: string; provider_ref: string; provider_endpoint: string; linux_node: string; runtime: 'docker';
   timeout_seconds: number; approval_ref: string;
+  audit_requirement?: 'controlled' | 'complete';
 }
 export interface RevisionRef { profile_id: string; version: string }
 export const outputSchema = {
@@ -15,7 +17,7 @@ export const outputSchema = {
   required: ['summary', 'value'], additionalProperties: false,
 } as const;
 export type Failure = 'provisioning_failed' | 'runtime_failed' | 'output_invalid' | 'input_required' |
-  'authorization_required' | 'execution_lost' | 'deadline_exceeded' | 'artifact_commit_failed' | 'required_capability_failed' | 'skill_use_unproven' | 'input_source_expired' | 'input_copy_failed';
+  'authorization_required' | 'execution_lost' | 'deadline_exceeded' | 'artifact_commit_failed' | 'required_capability_failed' | 'skill_use_unproven' | 'input_source_expired' | 'input_copy_failed' | 'isolation_unavailable' | 'policy_denied';
 export class TaskError extends Error {
   constructor(public code: Failure) { super(code); }
 }
@@ -26,6 +28,7 @@ export interface Run {
   run_id: string; owner: string; workspace: string; request_digest: string; prompt: string;
   request_digest_version?: 2; manifest_digest?: string;
   skills?: SkillEvidence[]; mcp?: McpEvidence[];
+  boundary?: BoundaryEvidence;
   manifest: { skills?: SkillBinding[]; profile: Profile; environment?: RevisionRef; model?: RevisionRef; output_contract: 'summary-value@1' | 'data-statistics@1' | 'research-report@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema | typeof researchSchema;
     grant: { tools: string[]; mcp: McpBinding[]; inputs: InputBinding[]; external_access: 'model-only' | 'registered-readonly' }; deadline_at: string };
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out' | 'cancelled';
@@ -53,7 +56,7 @@ export interface SandboxPort {
   sourceFor?(run: Run): string;
   prepare(run: Run): Promise<string>;
   loadInputs?(run: Run, inputs: LoadedInput[]): Promise<void>;
-  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown>;
+  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary): Promise<unknown>;
   requestStop?(run: Run): Promise<void>;
   forceStop?(run: Run): Promise<'stopped' | 'unknown'>;
   cleanup(run: Run): Promise<'absent' | 'unknown' | 'present'>;

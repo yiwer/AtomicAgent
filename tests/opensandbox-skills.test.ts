@@ -19,14 +19,16 @@ for (const scenario of ['completed', 'started', 'wrong-attempt', 'partial', 'ove
      if (url.pathname === '/ping') { res.end('{}'); return; }
      if (url.pathname === '/directories') { res.writeHead(204); res.end(); return; }
      if (url.pathname === '/files/upload') { for await (const chunk of req) uploaded += String(chunk); res.writeHead(204); res.end(); return; }
-     if (url.pathname === '/command') { commands++; res.writeHead(500); res.end('{"message":"SYNTHETIC_SECRET"}'); return; }
-     if (url.pathname === '/files/info') { res.end(JSON.stringify({ '/workspace/skill-evidence.jsonl': { type: 'file', size: scenario === 'oversized' ? 256001 : Buffer.byteLength(document) } })); return; }
+     if (url.pathname === '/command') { let body='';for await(const chunk of req)body+=String(chunk);
+       if(body.includes('isolation-probe.js')){res.setHeader('Content-Type','text/event-stream');res.end('data: '+JSON.stringify({type:'stdout',text:'atomic-isolation-v1:node24.18.0:sdk0.3.270:permit-v1'})+'\n\ndata: '+JSON.stringify({type:'execution_complete',execution_time:1})+'\n\n');return;}
+       commands++; res.writeHead(500); res.end('{"message":"SYNTHETIC_SECRET"}'); return; }
+     if (url.pathname === '/files/info') { res.end(JSON.stringify({ '/run/atomicagent/skill-evidence.jsonl': { type: 'file', size: scenario === 'oversized' ? 256001 : Buffer.byteLength(document) } })); return; }
      if (url.pathname === '/files/download') { res.end(document); return; }
      res.writeHead(404); res.end('{}');
    });
    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
    const address = server.address(); if (!address || typeof address === 'string') throw new Error('missing_address'); host = `127.0.0.1:${address.port}`;
-   const adapter = new OpenSandboxAdapter({ domain: 'http://' + host, apiKey: 'test' }, () => 'synthetic-model-token');
+   const adapter = new OpenSandboxAdapter({ domain: 'http://' + host, apiKey: 'test' }, () => 'synthetic-model-token',[fixtureProfile.image]);
    const run = { run_id: 'run', attempt_id: 'attempt', prompt: 'file task', allocation: { resource_id: 'sandbox', operation_id: 'allocation' }, manifest: { profile: { ...fixtureProfile, mode: 'opensandbox' }, skills: [skill], output_contract: 'data-statistics@1', deadline_at: new Date(Date.now()+30000).toISOString(), grant: { inputs: [] } } } as unknown as Run;
    let observed: SkillEvidence[] | undefined;
    await assert.rejects(adapter.execute(run, new AbortController().signal, e => { observed = e; }));

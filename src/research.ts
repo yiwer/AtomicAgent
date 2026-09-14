@@ -68,6 +68,7 @@ export function researchServer(binding: McpBinding, signal: AbortSignal, record:
   if (pending.has(source.id)) { call.authorized = false; call.outcome = 'denied'; await record(null, 'denied', call); throw new TaskError('required_capability_failed'); }
   pending.add(source.id); await record(null, 'intent', call);
   try {
+  signal.throwIfAborted();
   let text = source.snapshot, status: number | null = null;
   if (binding.mode === 'network') {
    const url = new URL(source.url);

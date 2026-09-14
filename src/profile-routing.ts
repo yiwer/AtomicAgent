@@ -1,3 +1,4 @@
+import type { ObserveBoundary } from './execution-boundary.js';
 import type { ObserveMcp } from './research.js';
 import type { ObserveSkills } from './skills.js';
 import { TaskError, type LoadedInput, type Profile, type Run, type SandboxPort } from './domain.js';
@@ -27,7 +28,7 @@ export class RoutedSandbox implements SandboxPort {
     if (!adapter.loadInputs) throw new TaskError('provisioning_failed');
     await adapter.loadInputs(run, inputs);
   }
-  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp) { return this.forRun(run).execute(run, signal, observeSkills, observeMcp); }
+  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary) { return this.forRun(run).execute(run, signal, observeSkills, observeMcp, observeBoundary); }
   cleanup(run: Run) { return this.forRun(run, 'cleanup').cleanup(run); }
   async requestStop(run: Run) { await this.forRun(run, 'cleanup').requestStop?.(run); }
   async forceStop(run: Run) { return await this.forRun(run, 'cleanup').forceStop?.(run) ?? 'unknown' as const; }

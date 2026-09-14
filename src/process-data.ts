@@ -3,10 +3,12 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseRows, csvText, safeInputPath } from './file-contract.js';
+import { readSandboxFile } from './sandbox-files.js';
+import { INPUT_LIMIT } from './file-contract.js';
 export async function processData(root: string) {
-  const request = JSON.parse(await readFile(join(root, 'request.json'), 'utf8')) as { input_path: string; format: 'csv' | 'json' };
+  const request = JSON.parse((await readSandboxFile(root, 'request.json', 65536)).toString('utf8')) as { input_path: string; format: 'csv' | 'json' };
   if (!safeInputPath(request.input_path)) throw new Error('unsafe_input');
-  const rows = parseRows(await readFile(join(root, request.input_path), 'utf8'), request.format);
+  const rows = parseRows((await readSandboxFile(root, request.input_path, INPUT_LIMIT)).toString('utf8'), request.format);
   const valid = [], rejected = []; const sums = new Map<string, bigint>(); let total = 0n;
   for (const row of rows) {
     if (!/^-?\d{1,30}(\.\d{1,18})?$/.test(row.value)) { rejected.push(row); continue; }

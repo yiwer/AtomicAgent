@@ -63,12 +63,13 @@ for(const boundary of ['connect','request-upload'] as const) test(`cancellation 
     if(req.url==='/ping'){res.end('{}');return;}
     if(req.url==='/directories'){res.writeHead(204);res.end();return;}
     if(req.url==='/files/upload'){for await(const _ of req){}controller.abort();res.writeHead(204);res.end();return;}
-    if(req.url==='/command')commands++;
+    if(req.url==='/command'){let body='';for await(const chunk of req)body+=String(chunk);
+      if(body.includes('isolation-probe.js')){res.setHeader('Content-Type','text/event-stream');res.end('data: '+JSON.stringify({type:'stdout',text:'atomic-isolation-v1:node24.18.0:sdk0.3.270:permit-v1'})+'\n\ndata: '+JSON.stringify({type:'execution_complete',execution_time:1})+'\n\n');return;}commands++;}
     res.writeHead(500);res.end('{}');
   });
   await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise<void>(r=>server.close(()=>r())));
   const address=server.address();if(!address||typeof address==='string')throw new Error('address');host=`127.0.0.1:${address.port}`;
-  const adapter=new OpenSandboxAdapter({domain:'http://'+host,apiKey:'test'},()=> 'synthetic-token');
+  const adapter=new OpenSandboxAdapter({domain:'http://'+host,apiKey:'test'},()=> 'synthetic-token',[fixtureProfile.image]);
   const run={run_id:'run',attempt_id:'attempt',prompt:'test',allocation:{resource_id:'owned',operation_id:'op'},manifest:{profile:fixtureProfile,deadline_at:new Date(Date.now()+30000).toISOString(),grant:{inputs:[],mcp:[]},output_contract:'summary-value@1'}} as unknown as Run;
   await assert.rejects(adapter.execute(run,controller.signal));assert.equal(commands,0);
 });

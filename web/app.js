@@ -89,6 +89,8 @@ async function renderDetail(id, open = false) {
   }
   if (!run.inputs.length) $('input-bindings').textContent = '此任务没有文件输入';
   $('mcp-evidence').textContent = JSON.stringify(run.mcp ?? [], null, 2);
+  $('boundary-summary').textContent = run.boundary ? `隔离：${run.boundary.isolation} · 审计覆盖：partial（受控模型与工具；未观察全部系统调用） · ${run.boundary.observed_at}` : '未知：尚无真实隔离观测。确定性演示不证明隔离。';
+  $('boundary-evidence').textContent = run.boundary ? JSON.stringify(run.boundary, null, 2) : '无执行边界证据';
   if (run.execution.output_contract === 'research-report@1') fact('研究检查范围', '格式与引用检查通过不代表结论正确；结论语义未核验。');
   $('skill-evidence').replaceChildren();
   const state = value => value === null ? '未知' : value ? '是' : '否';

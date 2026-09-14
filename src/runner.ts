@@ -1,21 +1,62 @@
 // Runs only inside the pinned Linux image, never in the API process or developer workspace.
-import { readFile, writeFile, open } from 'node:fs/promises';
+import { readFile, writeFile, open, mkdir, rename } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { runClaude, type ClaudeRequest } from './claude-execution.js';
+import { isolatedQuery } from './isolated-query.js';
+import { TaskError } from './domain.js';
+import type { BoundaryEvidence } from './execution-boundary.js';
+import { waitForPermit } from './action-permit.js';
 async function main() {
- const request = JSON.parse(await readFile('/workspace/request.json', 'utf8')) as ClaudeRequest;
- const marker = await open('/workspace/attempt.started', 'wx', 0o600);
+ const request = JSON.parse(await readFile('/run/atomicagent/request.json', 'utf8')) as ClaudeRequest;
+ const marker = await open('/run/atomicagent-attempt.started', 'wx', 0o600);
  await marker.writeFile(request.attempt_id); await marker.sync(); await marker.close();
  if (process.versions.node !== '24.18.0') return { failure: 'runtime_failed' };
  const controller = new AbortController();
  const check = async () => {
-  try { const marker = JSON.parse(await readFile('/workspace/cancel.json', 'utf8'));
+  try { const marker = JSON.parse(await readFile('/run/atomicagent-cancel.json', 'utf8'));
    if (marker.run_id === request.run_id && marker.attempt_id === request.attempt_id) controller.abort();
   } catch { /* A missing marker is not cancellation; forced provider disposal remains independent. */ }
  };
  await check();
+ await writeFile('/workspace/request.json', JSON.stringify({ input_path:request.input_path, format:(request as ClaudeRequest & {format?:string}).format }), { flag:'wx', mode:0o444 });
  const timer = setInterval(() => void check(), 200);
- try { return await runClaude(request, '/workspace', undefined, controller.signal); }
- finally { clearInterval(timer); }
+ const controlRoot = '/run/atomicagent'; await mkdir(controlRoot, { mode:0o700, recursive:true });
+ const boundary: BoundaryEvidence = { run_id:request.run_id,attempt_id:request.attempt_id,source:'controlled-runner:namespace-and-gateway',observed_at:new Date().toISOString(),isolation:'unknown',audit_coverage:'partial',calls:[] };
+ let journalWrites = Promise.resolve();
+ const persist = () => {
+  boundary.observed_at = new Date().toISOString();
+  const snapshot = JSON.stringify(boundary);
+  journalWrites = journalWrites.then(async()=>{
+   const journal = await open(`${controlRoot}/boundary.next`, 'w', 0o600);
+   try { await journal.writeFile(snapshot); await journal.sync(); }
+   finally { await journal.close(); }
+   await rename(`${controlRoot}/boundary.next`,`${controlRoot}/boundary.json`);
+  });
+  return journalWrites;
+ };
+ let isolation: Awaited<ReturnType<typeof isolatedQuery>> | undefined;
+ try {
+  isolation = await isolatedQuery(request, '/workspace', controlRoot, async event => {
+   if (boundary.calls.length >= 128) { controller.abort(); throw new TaskError('policy_denied'); }
+   boundary.calls.push(event); try { await persist(); } catch (error) { controller.abort(); throw error; }
+   if(event.outcome==='started') await waitForPermit(controlRoot,{run_id:request.run_id,attempt_id:request.attempt_id,invocation_id:event.invocation_id},Math.min(Date.parse(request.deadline_at),Date.now()+10000),controller.signal);
+  });
+  boundary.isolation = 'enforced'; await persist();
+  request.evidence_root = controlRoot;
+  request.authorizeAction = async kind => {
+   if(boundary.calls.length>=128)throw new TaskError('policy_denied');
+   const invocation_id=randomUUID();boundary.calls.push({invocation_id,boundary:kind,outcome:'started',observed_at:new Date().toISOString()});await persist();
+   await waitForPermit(controlRoot,{run_id:request.run_id,attempt_id:request.attempt_id,invocation_id},Math.min(Date.parse(request.deadline_at),Date.now()+10000),controller.signal);
+  };
+  request.onDenied = async () => { if(boundary.calls.length>=128) { controller.abort(); throw new TaskError('policy_denied'); } boundary.calls.push({invocation_id:randomUUID(),boundary:'tool',outcome:'denied',observed_at:new Date().toISOString()}); await persist(); };
+  const result = await runClaude(request, '/workspace', isolation.query, controller.signal);
+  await isolation.close();
+  return { ...result, ...(boundary.calls.some(c=>c.outcome==='denied') ? { failure:'policy_denied' } : {}), boundary };
+ } catch (error) {
+  boundary.isolation = isolation ? 'unknown':'unavailable'; await persist();
+  return { failure:error instanceof TaskError ? error.code:'isolation_unavailable',boundary };
+ }
+ finally { await isolation?.close(); clearInterval(timer); }
 }
-try { await writeFile('/workspace/result.json', JSON.stringify(await main()), { flag: 'wx', mode: 0o600 }); }
+try { await writeFile('/run/atomicagent/result.json', JSON.stringify(await main()), { flag: 'wx', mode: 0o600 }); }
 catch { process.exitCode = 1; }

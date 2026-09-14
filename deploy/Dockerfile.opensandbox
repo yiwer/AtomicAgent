@@ -1,0 +1,13 @@
+# Exact upstream source plus the reviewed AtomicAgent bootstrap capability patch.
+ARG PYTHON_IMAGE=python@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+FROM ${PYTHON_IMAGE}
+RUN apt-get update && apt-get install -y --no-install-recommends patch ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+ADD https://github.com/opensandbox-group/OpenSandbox/archive/d8cfce39dc1d846e580510ca44f44c495cbe95c4.tar.gz /tmp/source.tgz
+RUN tar -xzf /tmp/source.tgz --strip-components=1 && rm /tmp/source.tgz
+COPY deploy/opensandbox-isolation.patch /tmp/isolation.patch
+RUN patch -p1 < /tmp/isolation.patch
+WORKDIR /app/server
+RUN pip install --no-cache-dir uv==0.10.12 && uv sync --frozen --no-dev
+ENV PATH="/app/server/.venv/bin:$PATH" SANDBOX_CONFIG_PATH=/etc/opensandbox/config.toml
+CMD ["opensandbox-server"]

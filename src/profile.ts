@@ -6,12 +6,14 @@ export const fixtureProfile: Profile = {
   runtime: 'docker', timeout_seconds: 60, approval_ref: 'deterministic-test-only',
 };
 export function validateProfile(profile: Profile): void {
+  if (profile.audit_requirement === 'complete') throw new ApiError(503, 'audit_coverage_unavailable');
+  if (profile.audit_requirement !== undefined && profile.audit_requirement !== 'controlled') throw new ApiError(503, 'invalid_profile');
   if (!/^[-a-zA-Z0-9_.]{1,80}@[1-9][0-9]{0,6}$/.test(profile.id) || profile.revision !== profile.id.split('@')[1] || profile.runtime !== 'docker' ||
       !Number.isInteger(profile.timeout_seconds) || profile.timeout_seconds < 1 || profile.timeout_seconds > 3600) {
     throw new ApiError(503, 'invalid_profile');
   }
   if (profile.mode === 'fixture') return;
-  if (profile.mode !== 'opensandbox' || !/^.+@sha256:[a-f0-9]{64}$/.test(profile.image) ||
+  if (profile.mode !== 'opensandbox' || !/^(?:.+@)?sha256:[a-f0-9]{64}$/.test(profile.image) ||
       profile.node !== '24.18.0' || profile.sdk !== '0.3.270' || profile.cli !== 'bundled-with-sdk-0.3.270' ||
       ![profile.model, profile.secret_ref, profile.provider_ref, profile.linux_node, profile.approval_ref].every(v => typeof v === 'string' && v.length > 0 && !v.includes('REPLACE')))
     throw new ApiError(503, 'invalid_profile');

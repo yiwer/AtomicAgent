@@ -14,6 +14,7 @@ async function main() {
     profile: Profile; identities: Identity[]; database: string; port: number;
     opensandbox?: { domain: string; api_key_ref: string };
     approved_profiles?: Profile[];
+    isolation_qualified_images?: string[];
     providers?: { ref: string; endpoint: string; api_key_ref: string }[];
     legacy_provider_binding_confirmations?: { ref: string; endpoint: string; api_key_ref: string; approval_ref: string }[];
   };
@@ -26,6 +27,8 @@ async function main() {
   try {
     const profiles = [config.profile, ...(config.approved_profiles ?? [])];
     profiles.forEach(validateProfile);
+    const qualifiedImages=config.isolation_qualified_images ?? [];
+    if(!Array.isArray(qualifiedImages)||qualifiedImages.some(image=>typeof image!=='string'||!/^(?:.+@)?sha256:[a-f0-9]{64}$/.test(image)))throw new Error('invalid_isolation_qualification');
     const providers = [...(config.providers ?? [])];
     if (config.opensandbox) providers.push({ ref: config.profile.provider_ref, endpoint: config.opensandbox.domain, api_key_ref: config.opensandbox.api_key_ref });
     if (new Set(providers.map(p => p.ref)).size !== providers.length) throw new Error('duplicate_provider_binding');
@@ -38,7 +41,7 @@ async function main() {
     if (live.length && process.platform !== 'linux') throw new Error('linux_opensandbox_configuration_required');
     for (const profile of live) if (!providers.some(p => p.ref === profile.provider_ref && p.endpoint === profile.provider_endpoint)) throw new Error('provider_binding_mismatch');
     // Only names explicitly authorized by this private deployment are read. API data never reaches process.env.
-    const allowedNames = new Set([...live.map(p => p.secret_ref), ...providers.map(p => p.api_key_ref)]);
+    const allowedNames = new Set([...live.filter(p=>qualifiedImages.includes(p.image)).map(p => p.secret_ref), ...providers.map(p => p.api_key_ref)]);
     const secrets = new Map<string, string>();
     for (const name of allowedNames) {
       if (!/^[A-Z][A-Z0-9_]{1,100}$/.test(name) || !process.env[name]) throw new Error('secret_binding_unavailable');
@@ -52,7 +55,7 @@ async function main() {
       return new OpenSandboxAdapter({ domain: provider.endpoint, apiKey: secrets.get(provider.api_key_ref)! }, reference => {
         if (reference !== profile.secret_ref || !secrets.has(reference)) throw new Error('secret_binding_unavailable');
         return secrets.get(reference)!;
-      });
+      }, qualifiedImages);
     }, [...profiles.filter(p => p.mode === 'fixture'), ...providers.map(p => ({ mode: 'opensandbox' as const, provider_ref: p.ref, provider_endpoint: p.endpoint }))]);
     app = await createApp({ database, profile: config.profile, approvedProfiles: config.approved_profiles, identities: config.identities, sandbox,
       deploymentBindings: providers.map(p => {

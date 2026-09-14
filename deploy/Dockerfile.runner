@@ -9,10 +9,11 @@ RUN npx tsc
 RUN npm prune --omit=dev
 
 FROM ${NODE_IMAGE}
+RUN apt-get update && apt-get install -y --no-install-recommends bubblewrap=0.8.0-2+deb12u1 && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/atomicagent
 COPY --from=build /opt/atomicagent/node_modules ./node_modules
 COPY --from=build /opt/atomicagent/dist ./dist
 COPY package.json ./
-RUN mkdir /workspace && chown node:node /workspace
+RUN mkdir /workspace
 WORKDIR /workspace
 CMD ["tail", "-f", "/dev/null"]
