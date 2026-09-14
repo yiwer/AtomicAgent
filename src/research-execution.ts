@@ -42,6 +42,7 @@ export async function runResearch(request: ClaudeRequest, root: string, runQuery
    catch { failed = true; controller.abort(); }
   };
   await persist();
+  controller.signal.throwIfAborted();
   const messages = runQuery({ prompt: `Task request:\n${request.prompt}`, options: {
    model: request.model, cwd: root, tools: [], settingSources: [], skills: [], plugins: [],
    mcpServers: { research: service.server }, permissionMode: 'default',

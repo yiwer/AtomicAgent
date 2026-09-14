@@ -20,6 +20,7 @@ export class Cancellation {
   private signalled = new Set<string>();
   private nextCheck = new Map<string, number>();
   private emergency = new Map<string, Run>();
+  private known = new Map<string, Run>();
   private closed = false;
   private timer: ReturnType<typeof setInterval>;
   constructor(private store: Store, private sandbox: SandboxPort, private cleanup: (run: Run) => Promise<void>,
@@ -28,19 +29,26 @@ export class Cancellation {
   }
   wake() {
     if (this.closed) return;
-    for (const recorded of this.store.all()) {
+    let records: Run[];
+    try { records = this.store.all(); }
+    catch { records = [...new Map([...this.known, ...this.emergency]).values()]; }
+    for (const recorded of records) {
       const fallback = this.emergency.get(recorded.run_id);
       const run = fallback ? { ...recorded, cancellation: fallback.cancellation, stop: recorded.stop ?? fallback.stop } : recorded;
-      if (run.cleanup.status === 'complete' && ['stopped','not_started'].includes(run.stop?.status ?? '')) {
-        this.signalled.delete(run.run_id); this.nextCheck.delete(run.run_id); this.emergency.delete(run.run_id); continue;
+      if (run.cleanup.status === 'complete' && this.stopped(run)) {
+        this.signalled.delete(run.run_id); this.nextCheck.delete(run.run_id); this.emergency.delete(run.run_id); this.known.delete(run.run_id); continue;
       }
-      if (run.cancellation?.decision !== 'accepted' || (run.cleanup.status === 'complete' && ['stopped','not_started'].includes(run.stop?.status ?? '')) || this.busy.has(run.run_id)) continue;
+      if (run.cancellation?.decision !== 'accepted') continue;
+      this.known.set(run.run_id, run);
+      if (this.busy.has(run.run_id)) continue;
       if (this.clock() < Math.max(this.nextCheck.get(run.run_id) ?? 0, Date.parse(run.stop?.retry_at ?? '') || 0)) continue;
       const operation = this.reconcile(run).catch(() => { /* Immutable identities and pending facts survive failed writes. */ })
         .finally(() => { this.busy.delete(run.run_id); this.resumed(); });
       this.busy.set(run.run_id, operation);
     }
   }
+  private stopped(run: Run) { return run.stop?.status === 'stopped' || run.stop?.status === 'not_started'; }
+  private current(run: Run) { try { return this.store.get(run.run_id) ?? run; } catch { return run; } }
   recordFailure(run: Run) {
     if (run.terminal_at || this.emergency.has(run.run_id)) return;
     const requestedAt = this.clock();
@@ -52,7 +60,7 @@ export class Cancellation {
   private async reconcile(run: Run) {
     const checks = (run.stop?.checks ?? 0) + 1;
     const retryAt = this.clock() + Math.min(30_000, 1000 * 2 ** Math.min(checks - 1, 5));
-    if (run.attempt_id && !['stopped','not_started'].includes(run.stop?.status ?? '')) {
+    if (run.attempt_id && !this.stopped(run)) {
       if (!this.signalled.has(run.run_id)) {
         this.signalled.add(run.run_id);
         // Best effort graceful SDK interrupt through the controlled runner. Failure cannot defer the forced deadline.
@@ -71,12 +79,12 @@ export class Cancellation {
           { outcome: status, evidence: { source, resource_id: run.allocation?.resource_id ?? null, operation_id: run.attempt_id, observed_at: observedAt } });
       } finally {
         // Cleanup is independent and can still proceed during observation-write failure.
-        if (status === 'stopped') { this.signalled.delete(run.run_id); await this.cleanup(this.store.get(run.run_id) ?? run); }
+        if (status === 'stopped') { this.signalled.delete(run.run_id); await this.cleanup(this.current(run)); }
       }
       return;
     }
     this.nextCheck.set(run.run_id, this.clock() + 30_000);
-    await this.cleanup(this.store.get(run.run_id) ?? run);
+    await this.cleanup(this.current(run));
   }
   async close() { this.closed = true; clearInterval(this.timer); await Promise.allSettled(this.busy.values()); }
 }

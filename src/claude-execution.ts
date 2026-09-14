@@ -53,7 +53,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
       }
       await persist();
     }
-    cancellation?.throwIfAborted();
+    controller.signal.throwIfAborted();
     const messages = runQuery({ prompt: `Task request:\n${request.prompt}`, options: {
       model: request.model, cwd: root, tools: [...(fileTask ? ['Bash'] : []), ...(selected.length ? ['Skill'] : [])], mcpServers: {}, settingSources: [],
       skills: selected.map(s => s.entry), plugins: selected.length ? [{ type: 'local', path: pluginPath }] : [],
@@ -72,7 +72,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
               try { await persist(); } catch { evidenceFailed = true; allowed = false; controller.abort(); }
             }
           }
-          return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: allowed ? 'allow' : 'deny', permissionDecisionReason: 'registered-capability-only' } };
+          return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: allowed && permitted(input.tool_name, input.tool_input as Record<string, unknown>) ? 'allow' : 'deny', permissionDecisionReason: 'registered-capability-only' } };
         }] }],
         PostToolUse: [{ hooks: [async input => {
           if (input.hook_event_name !== 'PostToolUse') return {};

@@ -7,6 +7,20 @@ import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { runClaude, type QueryPort } from '../src/claude-execution.js';
 import { registeredSkills } from '../src/skills.js';
 
+test('cancellation while a Skill permission journal is awaiting persistence cannot return a stale allow', async t => {
+ const root=await mkdtemp(join(tmpdir(),'atomic-cancel-hook-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const cancellation=new AbortController(),skill={...registeredSkills[0]!,id:'statistics',version:'1',must_use:true};let decision:unknown;
+ const port:QueryPort=async function*({options}){
+  yield {type:'system',subtype:'init',skills:[skill.entry],tools:['Skill'],plugins:[{name:'atomic-registered',path:join(root,'registered-skills')}]} as unknown as SDKMessage;
+  const pre=options!.hooks!.PreToolUse![0]!.hooks[0]!;
+  const pending=pre({hook_event_name:'PreToolUse',tool_name:'Skill',tool_input:{skill:skill.entry},tool_use_id:'cancel-race',session_id:'test',transcript_path:'',cwd:root},'cancel-race',{signal:new AbortController().signal});
+  cancellation.abort();
+  decision=(await pending as any).hookSpecificOutput.permissionDecision;
+ };
+ await runClaude({prompt:'test',model:'test',endpoint:'https://example.invalid',deadline_at:new Date(Date.now()+30000).toISOString(),attempt_id:'attempt',run_id:'run',skills:[skill]},root,port,cancellation.signal);
+ assert.equal(decision,'deny');
+});
+
 test('controlled Claude SDK boundary isolates plugin discovery and records init separately from a successful Skill hook', async t => {
  const root = await mkdtemp(join(tmpdir(), 'atomic-claude-skills-')); t.after(() => rm(root, { recursive: true, force: true }));
  const skill = { ...registeredSkills[0]!, id: 'statistics', version: '1', must_use: true };

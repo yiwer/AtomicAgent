@@ -68,6 +68,15 @@ export class Worker {
       if (!failure) { this.files.commit(artifacts, run.terminal_at); run.result = result as Run['result']; run.artifacts = artifacts.map(a => a.object_id); }
     });
   }
+  private async preparationReturned(run: Run, action: string, update: (run: Run) => void) {
+    if (this.closed) { await this.sandbox.cleanup(run); return; }
+    try { this.store.change(run.run_id, action, update); }
+    finally {
+      let disposalRequired = true;
+      try { disposalRequired = !!this.store.get(run.run_id)?.terminal_at; } catch { /* No new execution is safe without its record. */ }
+      if (disposalRequired) await this.cleanup(run);
+    }
+  }
   private async execute(queued: Run) {
     let latest = queued;
     let staged: StoredObject[] = [];
@@ -86,10 +95,7 @@ export class Worker {
       latest = run;
       const preparation = this.sandbox.prepare(run).then(async resource => {
         latest = { ...run, allocation: { ...run.allocation!, resource_id: resource, creation_pending: false } };
-        if (!this.closed) {
-          try { this.store.change(run.run_id, 'sandbox.create-receipt', r => { r.allocation!.resource_id = resource; r.allocation!.creation_pending = false; }); }
-          finally { if (this.store.get(run.run_id)?.terminal_at) await this.cleanup(latest); }
-        } else await this.sandbox.cleanup(latest);
+        await this.preparationReturned(latest, 'sandbox.create-receipt', r => { r.allocation!.resource_id = resource; r.allocation!.creation_pending = false; });
         return resource;
       }, error => {
         latest = { ...run, allocation: { ...run.allocation!, creation_pending: false } };
@@ -107,10 +113,7 @@ export class Worker {
           latest = this.store.change(run.run_id, 'input.copy-intent', r => { if (r.terminal_at) throw new TaskError('execution_lost'); r.allocation!.input_copy_pending = true; });
           const copy = this.sandbox.loadInputs(prepared, inputs).finally(async () => {
             latest = { ...latest, allocation: { ...latest.allocation!, input_copy_pending: false } };
-            if (!this.closed) {
-              try { this.store.change(run.run_id, 'input.copy-returned', r => { r.allocation!.input_copy_pending = false; }); }
-              finally { if (this.store.get(run.run_id)?.terminal_at) await this.cleanup(latest); }
-            } else await this.sandbox.cleanup(latest);
+            await this.preparationReturned(latest, 'input.copy-returned', r => { r.allocation!.input_copy_pending = false; });
           });
           await beforeDeadline(copy, controller.signal);
         }

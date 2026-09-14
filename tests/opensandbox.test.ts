@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { OpenSandboxAdapter } from '../src/opensandbox.js';
 import type { Run } from '../src/domain.js';
+import { fixtureProfile } from '../src/profile.js';
 
 test('real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial', async t => {
   let getStatus = 404;
@@ -53,4 +54,21 @@ test('an already cancelled execution cannot connect or start a new command',asyn
   const adapter=new OpenSandboxAdapter({domain:'http://127.0.0.1:1',apiKey:'test'},()=> 'unused');
   const controller=new AbortController();controller.abort(new Error('cancelled-before-dispatch'));
   await assert.rejects(adapter.execute({} as Run,controller.signal),/cancelled-before-dispatch/);
+});
+for(const boundary of ['connect','request-upload'] as const) test(`cancellation during OpenSandbox ${boundary} prevents command dispatch`,async t=>{
+  const controller=new AbortController();let host='',commands=0;
+  const server=createServer(async(req,res)=>{
+    res.setHeader('Content-Type','application/json');
+    if(req.url?.includes('/endpoints/')){if(boundary==='connect')controller.abort();res.end(JSON.stringify({endpoint:host,headers:{}}));return;}
+    if(req.url==='/ping'){res.end('{}');return;}
+    if(req.url==='/directories'){res.writeHead(204);res.end();return;}
+    if(req.url==='/files/upload'){for await(const _ of req){}controller.abort();res.writeHead(204);res.end();return;}
+    if(req.url==='/command')commands++;
+    res.writeHead(500);res.end('{}');
+  });
+  await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise<void>(r=>server.close(()=>r())));
+  const address=server.address();if(!address||typeof address==='string')throw new Error('address');host=`127.0.0.1:${address.port}`;
+  const adapter=new OpenSandboxAdapter({domain:'http://'+host,apiKey:'test'},()=> 'synthetic-token');
+  const run={run_id:'run',attempt_id:'attempt',prompt:'test',allocation:{resource_id:'owned',operation_id:'op'},manifest:{profile:fixtureProfile,deadline_at:new Date(Date.now()+30000).toISOString(),grant:{inputs:[],mcp:[]},output_contract:'summary-value@1'}} as unknown as Run;
+  await assert.rejects(adapter.execute(run,controller.signal));assert.equal(commands,0);
 });

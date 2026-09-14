@@ -144,3 +144,13 @@ test('artifact transfer finishing after cancellation is discarded and cannot pub
   assert.equal((await (await l.request(`/v1/artifacts/${artifact}`)).json()).status,'removed');
   assert.equal((await l.request(`/v1/artifacts/${artifact}/download-link`,'POST',{})).status,409);
 });
+test('a record-read outage cannot crash cancellation polling or prevent disposal using an already-read resource identity',async t=>{
+  let clock=Date.now(),started=false,forced=0;
+  const sandbox=new FixtureSandbox();sandbox.execute=async()=>{started=true;return new Promise(()=>{});};sandbox.forceStop=async()=>{forced++;return 'stopped';};
+  const l=await lab(t,sandbox,()=>clock);const {run_id}=await l.submit('read-fault');await until(async()=>started,Boolean);
+  await l.request(`/v1/runs/${run_id}:cancel`,'POST',{});
+  const db=new DatabaseSync(join(l.directory,'runs.db'));db.exec('ALTER TABLE runs RENAME TO temporarily_unavailable_runs');
+  try{clock+=30000;await until(async()=>forced,n=>n===1);assert.equal(sandbox.resources.size,0);assert.equal((await l.request(`/v1/runs/${run_id}`)).status,503);}
+  finally{db.exec('ALTER TABLE temporarily_unavailable_runs RENAME TO runs');db.close();}
+  clock+=1001;await until(async()=> (await l.request(`/v1/runs/${run_id}`)).json(),r=>r.stop?.status==='stopped'&&r.cleanup.status==='complete');
+});

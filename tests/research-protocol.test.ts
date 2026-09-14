@@ -10,6 +10,14 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 const binding = { ...registeredMcps[0]!, id: 'research', version: '1' };
 
+test('cancelling research during initial journal persistence does not start a model query',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'atomic-cancel-research-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const cancellation=new AbortController();let queries=0;
+ const port:QueryPort=async function*(){queries++;};
+ const pending=runResearch({prompt:'test',model:'test',endpoint:'https://example.invalid',deadline_at:new Date(Date.now()+30000).toISOString(),run_id:'run',attempt_id:'attempt',mcp:[binding]},root,port,cancellation.signal);
+ cancellation.abort();await pending;assert.equal(queries,0);
+});
+
 test('actual MCP initialization and list/call enforce exact source arguments; no business write tool exists', async t => {
  const events: string[] = [], service = researchServer(binding, new AbortController().signal, async (_, event) => { events.push(event); });
  const client = new Client({ name: 'protocol-test', version: '1' }), [a,b] = InMemoryTransport.createLinkedPair();
