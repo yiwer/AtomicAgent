@@ -144,15 +144,23 @@ export class Worker {
       } r.mcp = checked; }); };
       const observeBoundary: ObserveBoundary = value => {
         const checked = validateBoundary(executing, value);
+        let admissionDenied=false;
         this.store.change(executing.run_id, 'boundary.observed', r => {
-          if (r.terminal_at || r.attempt_id !== executing.attempt_id) throw new TaskError('execution_lost');
+          if (r.attempt_id !== executing.attempt_id) throw new TaskError('execution_lost');
           const previous = r.boundary?.calls ?? [];
-          const added = checked.calls.filter(call=>!previous.some(old=>old.invocation_id===call.invocation_id && old.outcome===call.outcome));
+          const known = (id:string) => previous.some(c=>c.invocation_id===id&&c.outcome==='admitted');
+          const unseen = checked.calls.filter(call=>!previous.some(old=>old.invocation_id===call.invocation_id && old.outcome===call.outcome));
+          if(unseen.some(call=>call.outcome==='admitted' || previous.some(old=>old.invocation_id===call.invocation_id&&old.boundary!==call.boundary)))throw new TaskError('isolation_unavailable');
+          admissionDenied=Boolean(r.terminal_at && unseen.some(call=>call.outcome==='requested'&&!known(call.invocation_id)));
+          const added = r.terminal_at ? unseen.filter(call=>known(call.invocation_id)&&['completed','failed','unknown'].includes(call.outcome)) : unseen;
+          if(!r.terminal_at) for(const call of [...added])if(call.outcome==='requested'&&!known(call.invocation_id))added.push({...call,outcome:'admitted',observed_at:now()});
           if(previous.length+added.length>128)throw new TaskError('policy_denied');
           for (const call of added)
-            this.store.audit('platform',r.workspace,call.outcome==='started'?'boundary.action-admit':'boundary.call',call.outcome==='started'?'admitted':call.outcome,r.run_id,{ source:checked.source,operation_id:call.invocation_id,resource_id:call.boundary,observed_at:call.observed_at });
+            this.store.audit('platform',r.workspace,call.outcome==='admitted'?'boundary.action-admit':'boundary.call',call.outcome,r.run_id,{ source:checked.source,operation_id:call.invocation_id,resource_id:call.boundary,observed_at:call.observed_at });
           r.boundary = { ...(r.boundary && r.boundary.observed_at>checked.observed_at ? r.boundary:checked),calls:[...previous,...added] };
         });
+        // Throw after commit: a mixed terminal snapshot must preserve old call endings but grant no new permit.
+        if(admissionDenied)throw new TaskError('execution_lost');
       };
       const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp, observeBoundary), controller.signal);
       if (this.store.get(executing.run_id)?.boundary?.calls.some(c=>c.outcome==='denied')) throw new TaskError('policy_denied');

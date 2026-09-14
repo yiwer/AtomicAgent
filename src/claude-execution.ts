@@ -8,7 +8,7 @@ import { fileSchema } from './file-contract.js';
 import { collectFiles } from './sandbox-files.js';
 import { requestedSkills, verifySkill, type SkillBinding } from './skills.js';
 
-export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[]; evidence_root?: string; onDenied?: () => Promise<void>; authorizeAction?: (boundary:'tool'|'mcp')=>Promise<void> }
+export interface ClaudeRequest { prompt: string; model: string; endpoint: string; deadline_at: string; attempt_id: string; run_id: string; output_contract?: string; input_path?: string; skills?: SkillBinding[]; mcp?: McpBinding[]; evidence_root?: string; onDenied?: () => Promise<void>; authorizeAction?: (boundary:'tool'|'mcp', invocation_id?:string)=>Promise<string>; finishAction?: (invocation_id:string,outcome:'completed'|'failed')=>Promise<void> }
 export type QueryPort = (input: Parameters<typeof query>[0]) => AsyncIterable<SDKMessage>;
 // Public engine boundary. The caller supplies an isolated task root; production uses /workspace only.
 export async function runClaude(request: ClaudeRequest, root: string, runQuery: QueryPort = query, cancellation?: AbortSignal) {
@@ -22,6 +22,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
   const command = 'node /opt/atomicagent/dist/src/process-data.js';
   const pluginPath = join(root, 'registered-skills');
   const started = new Map<string, string>();
+  const actions = new Map<string,string>();
   let initialized = selected.length === 0;
   let journalEntries = 0;
   let evidenceFailed = false;
@@ -63,7 +64,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
         PreToolUse: [{ hooks: [async input => {
           if (input.hook_event_name !== 'PreToolUse') return {};
           let allowed = permitted(input.tool_name, input.tool_input as Record<string, unknown>);
-          if(allowed) { try { await request.authorizeAction?.('tool'); } catch { allowed=false; controller.abort(); } }
+          if(allowed) { try { const id=await request.authorizeAction?.('tool');if(id)actions.set(input.tool_use_id,id); } catch { allowed=false; controller.abort(); } }
           if (!allowed) await request.onDenied?.();
           const s = skillFor(input.tool_name, input.tool_input as Record<string, unknown>);
           if (s && allowed) {
@@ -78,6 +79,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
         }] }],
         PostToolUse: [{ hooks: [async input => {
           if (input.hook_event_name !== 'PostToolUse') return {};
+          const action=actions.get(input.tool_use_id);if(action){await request.finishAction?.(action,'completed');actions.delete(input.tool_use_id);}
           const s = skillFor(input.tool_name, input.tool_input as Record<string, unknown>);
           if (s && started.get(s.id) === input.tool_use_id) {
             const e = evidence.find(e => e.id === s.id)!;
@@ -87,6 +89,7 @@ export async function runClaude(request: ClaudeRequest, root: string, runQuery: 
           return {};
         }] }],
         PostToolUseFailure: [{ hooks: [async input => {
+          if(input.hook_event_name==='PostToolUseFailure'){const action=actions.get(input.tool_use_id);if(action){await request.finishAction?.(action,'failed');actions.delete(input.tool_use_id);}}
           if (input.hook_event_name === 'PostToolUseFailure' && skillFor(input.tool_name, input.tool_input as Record<string, unknown>)) {
             capabilityFailed = true; controller.abort();
           }

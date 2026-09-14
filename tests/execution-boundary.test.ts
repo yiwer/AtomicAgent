@@ -16,7 +16,8 @@ import type { BoundaryEvidence, ObserveBoundary } from '../src/execution-boundar
 test('model gateway constrains raw HTTP to one model operation, never follows redirect and revokes on close', async t => {
  const root = await mkdtemp(join(tmpdir(), 'atomic-gateway-'));
  const calls: { url: string; method: string; token: string }[] = [];
- const receiver = createServer((req, res) => { calls.push({ url: req.url!, method: req.method!, token: String(req.headers['x-api-key']) }); res.writeHead(302, { location: '/business-write' }); res.end(); });
+ let status=302;
+ const receiver = createServer((req, res) => { calls.push({ url: req.url!, method: req.method!, token: String(req.headers['x-api-key']) }); res.writeHead(status, { location: '/business-write' }); res.end(); });
  await new Promise<void>(r => receiver.listen(0, '127.0.0.1', r));
  const address = receiver.address() as { port: number };
  const socket = process.platform === 'win32' ? `\\\\.\\pipe\\atomic-${Date.now()}` : join(root, 'gateway.sock');
@@ -32,6 +33,7 @@ test('model gateway constrains raw HTTP to one model operation, never follows re
  assert.equal(await call('POST','/v1/messages',{model:'approved-model',messages:[],max_tokens:10}),502);
  assert.deepEqual(calls,[{url:'/v1/messages',method:'POST',token:'CANARY_PRIVATE_MODEL_TOKEN'}]);
  assert.ok(events.includes('denied')); assert.ok(events.includes('failed'));
+ status=429;assert.equal(await call('POST','/v1/messages',{model:'approved-model',messages:[],max_tokens:10}),429);assert.deepEqual(events.slice(-3),['requested','started','failed']);
  await gateway.close(); await assert.rejects(call('POST','/v1/messages',{model:'approved-model'}));
 });
 
@@ -47,15 +49,19 @@ test('parallel action admissions survive older snapshots and duplicate outcomes;
  const call=(path:string,body?:unknown)=>fetch(url+path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${'a'.repeat(40)}`,'Content-Type':'application/json','Idempotency-Key':'admission'},...(body?{body:JSON.stringify(body)}:{})});
  const run=await(await call('/v1/runs',{prompt:'parallel',profile:fixtureProfile.id,output_contract:'summary-value@1'})).json();
  for(let i=0;i<200&&!observe;i++)await new Promise(r=>setTimeout(r,10));assert.ok(observe);
- const first={invocation_id:randomUUID(),boundary:'model' as const,outcome:'started' as const,observed_at:base.observed_at};
+ const first={invocation_id:randomUUID(),boundary:'model' as const,outcome:'requested' as const,observed_at:base.observed_at};
  const second={...first,invocation_id:randomUUID(),boundary:'mcp' as const};
  observe({...base,calls:[first]});observe({...base,calls:[first,second]});
  observe({...base,calls:[{...second,outcome:'completed'}]});observe({...base,calls:[{...first,outcome:'completed'}]});
  observe({...base,calls:[first]});
- const before=await(await call('/v1/runs/'+run.run_id)).json();assert.equal(before.boundary.calls.length,4);assert.equal(before.boundary.calls.filter((c:{outcome:string})=>c.outcome==='started').length,2);
+ const third={...first,invocation_id:randomUUID()};observe({...base,calls:[third]});
+ const before=await(await call('/v1/runs/'+run.run_id)).json();assert.equal(before.boundary.calls.length,8);assert.equal(before.boundary.calls.filter((c:{outcome:string})=>c.outcome==='admitted').length,3);assert.equal(before.boundary.calls.some((c:{outcome:string})=>c.outcome==='started'),false);
  assert.equal((await call(`/v1/runs/${run.run_id}:cancel`,{})).status,200);
- assert.throws(()=>observe({...base,calls:[{...first,invocation_id:randomUUID()}]}),/execution_lost/);
- const after=await(await call('/v1/runs/'+run.run_id)).json();assert.equal(after.status,'cancelled');assert.deepEqual(after.boundary,before.boundary);release();
+ const cancelled=await(await call('/v1/runs/'+run.run_id)).json();assert.equal(cancelled.boundary.call_results.find((c:{invocation_id:string})=>c.invocation_id===third.invocation_id).outcome,'unknown');
+ assert.throws(()=>observe({...base,calls:[{...first,invocation_id:randomUUID()},{...third,outcome:'failed'}]}),/execution_lost/);
+ const mixed=await(await call('/v1/runs/'+run.run_id)).json();assert.equal(mixed.boundary.calls.at(-1).outcome,'failed');assert.equal(mixed.boundary.calls.at(-1).invocation_id,third.invocation_id);assert.equal(mixed.boundary.calls.length,9);
+ observe({...base,calls:[{...third,outcome:'failed'}]});
+ const after=await(await call('/v1/runs/'+run.run_id)).json();assert.equal(after.status,'cancelled');assert.deepEqual(after.boundary.calls.slice(0,8),before.boundary.calls);assert.equal(after.boundary.calls.at(-1).outcome,'failed');release();
 });
 
 test('file processor refuses an input directory symlink to material outside its task', async t => {

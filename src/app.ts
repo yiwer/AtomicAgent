@@ -1,4 +1,4 @@
-import { boundaryObservation } from './execution-boundary.js';
+import { boundaryObservation, boundaryCallResults } from './execution-boundary.js';
 import { requestedMcp, researchSchema } from './research.js';
 import { requestedSkills } from './skills.js';
 import { createHash, randomUUID, timingSafeEqual, createHmac } from 'node:crypto';
@@ -24,7 +24,7 @@ function publicRun(run: Run) {
     run_id: run.run_id, status: run.status, phase: run.phase, failure: run.failure,
     accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
     submission_digest: submissionDigest(run),
-    boundary: run.boundary ?? null, cleanup: run.cleanup, cancellation: run.cancellation ?? null, stop: run.stop ?? null, validation: run.validation, skills: run.skills ?? [], mcp: run.mcp ?? [],
+    boundary: run.boundary ? {...run.boundary,call_results:boundaryCallResults(run)} : null, cleanup: run.cleanup, cancellation: run.cancellation ?? null, stop: run.stop ?? null, validation: run.validation, skills: run.skills ?? [], mcp: run.mcp ?? [],
     inputs: run.manifest.grant.inputs.map(({ file_id, path, sha256, size_bytes, loaded, binding_id, source, loaded_at }) => ({ file_id, path, sha256, size_bytes, loaded, binding_id, source,
       copy: { run_id: run.run_id, path, loaded_at: loaded_at ?? null, status: loaded ? (run.cleanup.status === 'complete' ? 'removed' : 'loaded') : 'unconfirmed',
         cleanup_status: run.cleanup.status, observed_at: run.cleanup.observed_at, source: run.cleanup.source } })),

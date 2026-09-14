@@ -34,7 +34,8 @@ export async function runResearch(request: ClaudeRequest, root: string, runQuery
     if (event === 'denied') evidence.authorized = false;
     if (receipt) { evidence.authorized = true; evidence.acquired++; evidence.usage.bytes = (evidence.usage.bytes ?? 0) + Buffer.byteLength(receipt.text); }
     await persist();
-    if(event==='intent') await request.authorizeAction?.('mcp');
+    if(event==='intent') await request.authorizeAction?.('mcp',call.invocation_id);
+    if(event==='acquired'||event==='failed') await request.finishAction?.(call.invocation_id,event==='acquired'?'completed':'failed');
    } catch { failed = true; controller.abort(); throw new TaskError('required_capability_failed'); }
   });
   const permitted = (name: string, input: Record<string, unknown>) => !controller.signal.aborted && !failed && evidence.connected === true && evidence.callable === true && name === 'mcp__research__read_source' && service.permitted(input);

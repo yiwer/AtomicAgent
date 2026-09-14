@@ -35,20 +35,27 @@ async function main() {
   return journalWrites;
  };
  let isolation: Awaited<ReturnType<typeof isolatedQuery>> | undefined;
+ const pending = new Map<string,BoundaryEvidence['calls'][number]['boundary']>();
+ const record = async (event: BoundaryEvidence['calls'][number]) => {
+  try {
+   if(boundary.calls.length>=128)throw new TaskError('policy_denied');
+   boundary.calls.push(event);await persist();
+   if(event.outcome==='requested') {
+    pending.set(event.invocation_id,event.boundary);
+    await waitForPermit(controlRoot,{run_id:request.run_id,attempt_id:request.attempt_id,invocation_id:event.invocation_id},Math.min(Date.parse(request.deadline_at),Date.now()+10000),controller.signal);
+   }
+   if(['completed','failed','denied'].includes(event.outcome))pending.delete(event.invocation_id);
+  }catch(error){controller.abort();throw error;}
+ };
  try {
-  isolation = await isolatedQuery(request, '/workspace', controlRoot, async event => {
-   if (boundary.calls.length >= 128) { controller.abort(); throw new TaskError('policy_denied'); }
-   boundary.calls.push(event); try { await persist(); } catch (error) { controller.abort(); throw error; }
-   if(event.outcome==='started') await waitForPermit(controlRoot,{run_id:request.run_id,attempt_id:request.attempt_id,invocation_id:event.invocation_id},Math.min(Date.parse(request.deadline_at),Date.now()+10000),controller.signal);
-  });
+  isolation = await isolatedQuery(request, '/workspace', controlRoot, record);
   boundary.isolation = 'enforced'; await persist();
   request.evidence_root = controlRoot;
-  request.authorizeAction = async kind => {
-   if(boundary.calls.length>=128)throw new TaskError('policy_denied');
-   const invocation_id=randomUUID();boundary.calls.push({invocation_id,boundary:kind,outcome:'started',observed_at:new Date().toISOString()});await persist();
-   await waitForPermit(controlRoot,{run_id:request.run_id,attempt_id:request.attempt_id,invocation_id},Math.min(Date.parse(request.deadline_at),Date.now()+10000),controller.signal);
+  request.authorizeAction = async (kind, invocation_id=randomUUID()) => {
+   await record({invocation_id,boundary:kind,outcome:'requested',observed_at:new Date().toISOString()});return invocation_id;
   };
-  request.onDenied = async () => { if(boundary.calls.length>=128) { controller.abort(); throw new TaskError('policy_denied'); } boundary.calls.push({invocation_id:randomUUID(),boundary:'tool',outcome:'denied',observed_at:new Date().toISOString()}); await persist(); };
+  request.finishAction = async(invocation_id,outcome)=>{const kind=pending.get(invocation_id);if(!kind)throw new TaskError('execution_lost');await record({invocation_id,boundary:kind,outcome,observed_at:new Date().toISOString()});};
+  request.onDenied = async () => record({invocation_id:randomUUID(),boundary:'tool',outcome:'denied',observed_at:new Date().toISOString()});
   const result = await runClaude(request, '/workspace', isolation.query, controller.signal);
   await isolation.close();
   return { ...result, ...(boundary.calls.some(c=>c.outcome==='denied') ? { failure:'policy_denied' } : {}), boundary };
@@ -56,7 +63,7 @@ async function main() {
   boundary.isolation = isolation ? 'unknown':'unavailable'; await persist();
   return { failure:error instanceof TaskError ? error.code:'isolation_unavailable',boundary };
  }
- finally { await isolation?.close(); clearInterval(timer); }
+ finally { await isolation?.close(); clearInterval(timer);for(const [invocation_id,kind] of pending)await record({invocation_id,boundary:kind,outcome:'unknown',observed_at:new Date().toISOString()}); }
 }
 try { await writeFile('/run/atomicagent/result.json', JSON.stringify(await main()), { flag: 'wx', mode: 0o600 }); }
 catch { process.exitCode = 1; }

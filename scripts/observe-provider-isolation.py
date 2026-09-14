@@ -1,5 +1,6 @@
 """Read-only Docker observations, restricted to the explicitly supplied experiment image."""
 import json, subprocess, sys, time
+from pathlib import Path
 
 image = sys.argv[1]
 assert image.startswith('sha256:') and len(image) == 71
@@ -9,7 +10,12 @@ def inspect(resource):
     return json.loads(docker('inspect', '--format', '{{json .HostConfig}}', resource))
 
 seen = {}
-deadline = time.monotonic() + 100
+if len(sys.argv) > 2:
+    for line in Path(sys.argv[2]).read_text(encoding='utf-8-sig').splitlines():
+        record = json.loads(line)
+        if 'running' in record:
+            seen[record['running']['resource_id']] = record['running']
+deadline = time.monotonic() + (0 if seen else 100)
 while time.monotonic() < deadline:
     for resource in docker('ps', '-q', '--filter', 'ancestor=' + image).splitlines():
         if resource in seen:
@@ -30,6 +36,7 @@ while time.monotonic() < deadline:
                        'memory_limit': config['Memory'], 'pids_limit': config['PidsLimit'],
                        'privileged': config['Privileged'], 'ports': bindings,
                        'mounts': config.get('Binds', [])}
+        observation['resource_sample'] = docker('stats', '--no-stream', '--format', '{{json .}}', resource)
         seen[resource] = observation
         print(json.dumps({'running': observation}), flush=True)
     if len(seen) >= 4 and not docker('ps', '-q', '--filter', 'ancestor=' + image, '--filter', 'label=opensandbox.io/id'):
@@ -38,7 +45,11 @@ while time.monotonic() < deadline:
 
 for resource, observation in seen.items():
     for identity in [resource, observation['sidecar_id']]:
-        result = subprocess.run(['docker', 'inspect', '--format', '{{.Id}}', identity], capture_output=True, text=True)
-        assert result.returncode != 0 and 'No such object' in result.stderr
+        for attempt in range(100):
+            result = subprocess.run(['docker', 'inspect', '--format', '{{.Id}}', identity], capture_output=True, text=True)
+            if result.returncode != 0 and 'no such object' in result.stderr.lower():
+                break
+            time.sleep(.1)
+        assert result.returncode != 0 and 'no such object' in result.stderr.lower()
         print(json.dumps({'absent': identity, 'observed_at_epoch': time.time()}), flush=True)
 assert len(seen) >= 4, 'expected four actual Run resources'

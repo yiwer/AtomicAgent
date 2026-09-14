@@ -55,6 +55,7 @@ export class OpenSandboxAdapter implements SandboxPort {
     let observationImported = false, mcpImported = false;
     let pollingDone = false;
     let polling: Promise<void> | undefined;
+    const admittedCalls=new Set<string>();
     try {
       signal.throwIfAborted();
       await sandbox.files.createDirectories([{ path: '/run/atomicagent', mode: 700, owner: 'root', group: 'root' }]);
@@ -79,11 +80,12 @@ export class OpenSandboxAdapter implements SandboxPort {
         while(!pollingDone && !signal.aborted) {
           let checked;
           try { const raw=await sandbox.files.readFile('/run/atomicagent/boundary.json',{range:'bytes=0-32768'}); if(Buffer.byteLength(raw)<=32768) checked=validateBoundary(run,JSON.parse(raw)); } catch { /* A missing or partial spool cannot authorize. */ }
-          if(checked) for(const call of checked.calls.filter(c=>c.outcome==='started'&&!acknowledged.has(c.invocation_id))) {
+          if(checked) for(const call of checked.calls.filter(c=>c.outcome==='requested'&&!acknowledged.has(c.invocation_id))) {
             if(pollingDone||signal.aborted)break;
             try {
               // Worker performs durable authority admission before this acknowledgement is sent.
               observeBoundary(checked);
+              admittedCalls.add(call.invocation_id);
               if(pollingDone||signal.aborted)break;
               await sandbox.files.writeFiles([{path:`/run/atomicagent/permit-${call.invocation_id}.json`,mode:400,owner:'root',group:'root',data:JSON.stringify({run_id:run.run_id,attempt_id:run.attempt_id,invocation_id:call.invocation_id,allowed:true})}]);
               acknowledged.add(call.invocation_id);
@@ -114,7 +116,7 @@ export class OpenSandboxAdapter implements SandboxPort {
         const code = envelope.failure;
         throw new TaskError(code === 'isolation_unavailable' || code === 'policy_denied' || code === 'input_required' || code === 'authorization_required' || code === 'output_invalid' || code === 'deadline_exceeded' || code === 'required_capability_failed' || code === 'skill_use_unproven' ? code : 'runtime_failed');
       }
-      if (!observeBoundary || boundary.isolation !== 'enforced' || !boundary.calls.some(c=>c.boundary==='model'&&c.outcome==='started')) throw new TaskError('isolation_unavailable');
+      if (!observeBoundary || boundary.isolation !== 'enforced' || !boundary.calls.some(c=>c.boundary==='model'&&c.outcome==='completed'&&admittedCalls.has(c.invocation_id)&&boundary.calls.some(start=>start.invocation_id===c.invocation_id&&start.outcome==='started'))) throw new TaskError('isolation_unavailable');
       if (run.manifest.output_contract === 'research-report@1') {
         if (!Array.isArray(envelope.files) || envelope.files.length !== 1 || envelope.files.some(f => typeof f.base64 !== 'string' || typeof f.path !== 'string')) throw new TaskError('output_invalid');
         return { candidate: envelope.candidate, receipts: envelope.receipts, mcp: envelope.mcp, files: envelope.files.map(f => ({ path: f.path, bytes: Buffer.from(f.base64, 'base64') })) };

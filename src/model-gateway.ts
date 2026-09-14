@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 
-export interface BoundaryCall { invocation_id: string; boundary: 'model' | 'transport'; outcome: 'started' | 'completed' | 'denied' | 'failed'; observed_at: string }
+export interface BoundaryCall { invocation_id: string; boundary: 'model' | 'transport'; outcome: 'requested' | 'started' | 'completed' | 'denied' | 'failed'; observed_at: string }
 function hasRemoteSource(value: unknown): boolean {
  if (!value || typeof value !== 'object') return false;
  if (Array.isArray(value)) return value.some(hasRemoteSource);
@@ -42,17 +42,20 @@ export class ModelGateway {
     candidate.tools !== undefined && (!Array.isArray(candidate.tools) || candidate.tools.some((tool: { name?: string; type?: string }) => !tool || tool.type !== undefined && tool.type !== 'custom' || !this.grant.tools?.includes(tool.name ?? '')))) {
     await record('denied'); response.writeHead(403).end(); return;
    }
-   await record('started');
+   await record('requested');
    if (!valid()) throw new Error('revoked');
    const endpoint = new URL(this.grant.endpoint); endpoint.pathname = endpoint.pathname.replace(/\/$/, '') + '/v1/messages'; endpoint.search = '';
-   const result = await fetch(endpoint, { method: 'POST', body, redirect: 'error', signal: AbortSignal.any([this.controller.signal, disconnected.signal, AbortSignal.timeout(Math.max(1, this.grant.deadline-Date.now()))]),
+   const dispatched = fetch(endpoint, { method: 'POST', body, redirect: 'error', signal: AbortSignal.any([this.controller.signal, disconnected.signal, AbortSignal.timeout(Math.max(1, this.grant.deadline-Date.now()))]),
     headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': this.grant.token,
      ...(typeof request.headers['anthropic-beta'] === 'string' && request.headers['anthropic-beta'].length <= 2000 ? { 'anthropic-beta': request.headers['anthropic-beta'] } : {}) } });
+   void dispatched.catch(()=>{});
+   await record('started');
+   const result = await dispatched;
    if (result.status >= 300 && result.status < 400 || !valid()) throw new Error('redirect_or_revoked');
    response.writeHead(result.status, { 'content-type': result.headers.get('content-type')?.includes('text/event-stream') ? 'text/event-stream' : 'application/json' });
    let received = 0;
    if (result.body) for await (const chunk of result.body) { received += chunk.length; if (received > 8388608 || !valid() || disconnected.signal.aborted) throw new Error('response_limit'); if (!response.write(chunk)) await once(response, 'drain', { signal: AbortSignal.any([this.controller.signal,disconnected.signal]) }); }
-   await record('completed'); response.end();
+   await record(result.ok ? 'completed' : 'failed'); response.end();
   } catch {
    try { await record('failed'); } catch { this.active = false; this.controller.abort(); }
    if (!response.headersSent) response.writeHead(502); response.end();
