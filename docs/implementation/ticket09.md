@@ -43,7 +43,7 @@ HTTP 200 返回同一个公开 Run 投影，附 `cancellation` 与 `stop`。取�
 
 停止未知时保留执行槽，不放行下一 Attempt。独立协调器按每 Run 1、2、4、8、16、30 秒上限退避继续核验，持久 stop checks／retry_at；准备／独立回收未知最多每 30 秒重试。重启沿同一取消意图、宽限和 provider 路由继续处置，不重做 Agent。旧资源创建回执丢失时用原 operation 元数据处置，空 listing 不能证明未来不会出现资源；没有可靠闭合证据时保留未知。更完整的 provider 创建／启动对账、worker 接管及人工回收分别仍属 Tickets14／15／17。
 
-取消意图提交失败返回 503，不声称已接受；立即阻止本进程新增接纳／配置授权／执行，原已接纳 key 仍可查回。对已经读出的 Run／resource 保留有限内存停止路径：仍以原请求 30 秒为强停界限，停止和回收不能被后续观测写失败阻断。缺失的取消审计不补造成当时已记录；恢复后可能为 `execution_lost`，而非伪造 cancelled。持久资源意图在进程重启后仍支持处置。本票故障实验涵盖 SQLite 写拒绝；完整核心记录退化模式和应急记录落盘属于 Ticket21。
+取消意图提交失败返回 503，不声称已接受；立即阻止本进程新增接纳／配置授权／执行，原已接纳 key 仍可查回。对已经读出的 Run／resource 保留有限内存停止路径：仍以原请求 30 秒为强停界限，停止和回收不能被后续观测写失败阻断。缺失的取消审计不补造成当时已记录；恢复后可能为 `execution_lost`，而非伪造 cancelled。持久资源意图在进程重启后仍支持处置。本票故障实验涵盖 SQLite 写拒绝与读取暂不可用；协调器保留已读取的不可变资源身份，读故障不使timer崩溃或阻断处置。完整核心记录退化模式和应急记录落盘属于 Ticket21。
 
 `run.cancel-request` 保存实际授权主体／重复请求者，`run.cancel-decision` 保存裁定，`execution.force-stop-intent`／`execution.stop-observed` 和既有 cleanup 审计保存有界身份、来源、时间及结果。SSE 从同一持久 Run 生成取消／停止投影。`/internal/health.cancellation` 为本工作区带来源、查询时间、最近实际观测时间的接受／未启动／待核验／未知／已停止／未完成回收计数，无 Run ID、提示词或凭据，不能当作实时 provider 探针。
 

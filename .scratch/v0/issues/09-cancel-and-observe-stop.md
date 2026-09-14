@@ -34,3 +34,4 @@
 
 - 2026-09-14：根据用户“接受”发布；尚未开始产品实现或验收。
 - 2026-09-14：按 `$implement` 完成 API/A、原子取消终态、30 秒宽限、真实停止独立核验、未知退避/重启和准备/复制晚完成责任；[实施说明](../../../docs/implementation/ticket09.md)及[分层证据](../evidence/ticket09/verification.md)。当前确定性回归114/114、取消专属9/9及真实Windows子进程30.085秒停止通过，Chromium聚焦通过；全浏览器回归和双轴审查正在记录。获准模型/Linux OpenSandbox物理验收、人工综合验收仍未完成，AC不勾选。
+- 2026-09-14：实施及双轴审查完成。checkpoint `7e21860ae1fa136860fdf62b4b9ec73336af91ef`，修复 `56e940d06c3705cd0f65bb876f4e273fcbe06401`；最终类型／构建、全套119/119、Chromium17/17通过；取消专属10/10、provider协议6/6；Standards／Spec复核各0剩余问题。保留真实Windows受控进程证据；获准模型／Linux sandbox／人工综合验收尚缺，实施完成不关闭AC。
