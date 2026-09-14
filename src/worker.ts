@@ -1,5 +1,5 @@
 import { resourceEvidence } from './resource-limits.js';
-import { Limits } from './limits.js';
+import { Limits, executionSlotHeld } from './limits.js';
 import { validateResearch, researchMarkdown, type SourceReceipt, type McpEvidence, validateMcpEvidence } from './research.js';
 import { validateSkillEvidence, type ObserveSkills } from './skills.js';
 import { randomUUID } from 'node:crypto';
@@ -36,6 +36,7 @@ export class Worker {
   }
   cancel(id: string) { if (this.store.get(id)?.cancellation?.decision === 'accepted') this.controllers.get(id)?.abort(); this.cancellation.wake(); }
   cancelRecordFailure(run: Run) { this.recordFailure = true; this.controllers.get(run.run_id)?.abort(new TaskError('execution_lost')); this.cancellation.recordFailure(run); }
+  get activeRunIds():ReadonlySet<string>{return new Set(this.active.keys());}
   get acceptingWork() { return !this.recordFailure; }
   async recover() {
     let recordFailure = false;
@@ -57,7 +58,7 @@ export class Worker {
         if(run.status==='queued'){this.finish(run.run_id,'deadline_exceeded');this.cancellation.wake();}
       }
       const records=this.store.all();
-      const occupied=records.filter(r=>this.active.has(r.run_id)||r.status==='running'||r.allocation&&r.cleanup.status!=='complete'||r.stop&& !['stopped','not_started'].includes(r.stop.status));
+      const occupied=records.filter(r=>executionSlotHeld(r,this.active.has(r.run_id)));
       let slots=2-occupied.length;
       const workspaceCounts=new Map<string,number>();for(const run of occupied)workspaceCounts.set(run.workspace,(workspaceCounts.get(run.workspace)??0)+1);
       for(const run of records.reverse()){
@@ -180,7 +181,11 @@ export class Worker {
         // Throw after commit: a mixed terminal snapshot must preserve old call endings but grant no new permit.
         if(admissionDenied)throw new TaskError('execution_lost');
       };
-      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp, observeBoundary,value=>{const checked=resourceEvidence(executing,value);this.store.change(executing.run_id,'limits.execution-observed',r=>{if(r.terminal_at)throw new TaskError('execution_lost');r.resource_limits=checked;});}), controller.signal);
+      const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp, observeBoundary,value=>{
+        const checked=resourceEvidence(executing,value);
+        try{this.store.change(executing.run_id,'limits.execution-observed',r=>{if(r.terminal_at)throw new TaskError('execution_lost');r.resource_limits=checked;});}
+        catch(error){this.recordFailure=true;throw error;}
+      }), controller.signal);
       if (this.store.get(executing.run_id)?.boundary?.calls.some(c=>c.outcome==='denied')) throw new TaskError('policy_denied');
       const skillEvidence = this.store.get(executing.run_id)!.skills ?? [];
       for (const s of executing.manifest.skills ?? []) {

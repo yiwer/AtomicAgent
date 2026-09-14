@@ -55,6 +55,7 @@ class Guardian:
         self.db = sqlite3.connect(os.path.join(directory, 'guardian.db'), check_same_thread=False)
         self.db.executescript('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS intents(operation TEXT PRIMARY KEY, document TEXT NOT NULL); CREATE TABLE IF NOT EXISTS resources(id TEXT PRIMARY KEY, operation TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL, observed_at TEXT NOT NULL);')
         self.db.execute('CREATE TABLE IF NOT EXISTS volumes(name TEXT PRIMARY KEY, operation TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS observations(operation TEXT PRIMARY KEY,status TEXT NOT NULL,observed_at TEXT NOT NULL)')
         self.observed_at = None
         self.available = False
 
@@ -81,66 +82,100 @@ class Guardian:
         # Admission requires a fresh successful Docker inspection, not merely an HTTP server.
         docker('GET','/version')
 
-    def scan(self):
+    def discover(self, intent, item):
+        resource = docker('GET','/containers/'+item['Id']+'/json')
+        if resource is None:
+            return
+        labels = resource['Config'].get('Labels') or {}
+        if any(labels.get(key) != intent[field] for key,field in [('atomicagent_guardian','guardian_id'),('atomicagent_operation','operation_id'),('atomicagent_run','run_id')]):
+            raise ValueError('resource_identity_changed')
+        sidecar = 'opensandbox.io/egress-sidecar-for' in labels
+        image = self.egress_image if sidecar else intent['image'].split('@')[-1]
+        if resource['Image'] != image:
+            raise ValueError('resource_image_changed')
         with self.lock:
-            intents = [json.loads(row[0]) for row in self.db.execute('SELECT document FROM intents')]
-        for intent in intents:
-            labels = [f'atomicagent_guardian={self.identity}',f'atomicagent_operation={intent["operation_id"]}',f'atomicagent_run={intent["run_id"]}']
-            filters = urllib.parse.quote(json.dumps({'label':labels}))
-            resources = docker('GET','/containers/json?all=1&filters='+filters)
-            if resources is None:
-                raise ValueError('docker_unavailable')
-            for item in resources:
-                resource = docker('GET','/containers/'+item['Id']+'/json')
-                if resource is None:
-                    continue
-                expected = resource['Config'].get('Labels') or {}
-                if any(expected.get(key) != intent[field] for key,field in [('atomicagent_guardian','guardian_id'),('atomicagent_operation','operation_id'),('atomicagent_run','run_id')]):
-                    raise ValueError('resource_identity_changed')
-                sidecar = 'opensandbox.io/egress-sidecar-for' in expected
-                image = self.egress_image if sidecar else intent['image'].split('@')[-1]
-                if resource['Image'] != image:
-                    raise ValueError('resource_image_changed')
-                with self.lock:
-                    self.db.execute('INSERT OR IGNORE INTO resources VALUES(?,?,?,?,?)',(resource['Id'],intent['operation_id'],'sidecar' if sidecar else 'sandbox','present',stamp()))
-                    sandbox_id = expected.get('opensandbox.io/id') or expected.get('opensandbox.io/egress-sidecar-for')
-                    for mount in resource.get('Mounts',[]):
-                        if mount.get('Type') == 'volume' and mount.get('Name') == 'opensandbox-runtime-'+str(sandbox_id):
-                            volume = docker('GET','/volumes/'+mount['Name'])
-                            if volume is not None:
-                                self.db.execute('INSERT OR IGNORE INTO volumes VALUES(?,?,?,?)',(mount['Name'],intent['operation_id'],json.dumps(volume,sort_keys=True),'present'))
-                    self.db.commit()
-            if time.time() < datetime.datetime.fromisoformat(intent['deadline_at'].replace('Z','+00:00')).timestamp():
-                continue
-            with self.lock:
-                owned = list(self.db.execute('SELECT id,kind FROM resources WHERE operation=? ORDER BY kind DESC',(intent['operation_id'],)))
-            for identity,kind in owned:
-                # Persisted full Docker ID cannot target a replacement, even if names/labels are reused.
+            self.db.execute('INSERT OR IGNORE INTO resources VALUES(?,?,?,?,?)',(resource['Id'],intent['operation_id'],'sidecar' if sidecar else 'sandbox','present',stamp()))
+            self.db.commit()
+        sandbox_id = labels.get('opensandbox.io/id') or labels.get('opensandbox.io/egress-sidecar-for')
+        for mount in resource.get('Mounts',[]):
+            if mount.get('Type') == 'volume' and mount.get('Name') == 'opensandbox-runtime-'+str(sandbox_id):
+                volume = docker('GET','/volumes/'+mount['Name'])
+                if volume is not None:
+                    with self.lock:
+                        self.db.execute('INSERT OR IGNORE INTO volumes VALUES(?,?,?,?)',(mount['Name'],intent['operation_id'],json.dumps(volume,sort_keys=True),'present'))
+                        self.db.commit()
+
+    def expire(self, intent):
+        failed = False
+        with self.lock:
+            owned = list(self.db.execute('SELECT id,kind FROM resources WHERE operation=? ORDER BY kind DESC',(intent['operation_id'],)))
+        for identity,kind in owned:
+            status = 'unknown'
+            try:
                 observed = docker('GET','/containers/'+identity+'/json')
                 if observed is not None:
                     docker('DELETE','/containers/'+identity+'?force=1&v=1')
                     observed = docker('GET','/containers/'+identity+'/json')
                 status = 'absent' if observed is None else 'unknown'
-                with self.lock:
-                    self.db.execute('UPDATE resources SET status=?,observed_at=? WHERE id=?',(status,stamp(),identity))
-                    self.db.commit()
+            except Exception:
+                failed = True
             with self.lock:
-                volumes = list(self.db.execute("SELECT name,fingerprint FROM volumes WHERE operation=? AND status!='absent'",(intent['operation_id'],)))
-            for name,fingerprint in volumes:
+                self.db.execute('UPDATE resources SET status=?,observed_at=? WHERE id=?',(status,stamp(),identity))
+                self.db.commit()
+        with self.lock:
+            volumes = list(self.db.execute("SELECT name,fingerprint FROM volumes WHERE operation=? AND status!='absent'",(intent['operation_id'],)))
+        for name,fingerprint in volumes:
+            status = 'unknown'
+            try:
                 volume = docker('GET','/volumes/'+name)
                 if volume is not None:
                     if json.dumps(volume,sort_keys=True) != fingerprint:
                         raise ValueError('volume_identity_changed')
                     docker('DELETE','/volumes/'+name)
                     volume = docker('GET','/volumes/'+name)
-                with self.lock:
-                    self.db.execute('UPDATE volumes SET status=? WHERE name=?',('absent' if volume is None else 'unknown',name))
-                    self.db.commit()
-        self.observed_at, self.available = stamp(), True
+                status = 'absent' if volume is None else 'unknown'
+            except Exception:
+                failed = True
+            with self.lock:
+                self.db.execute('UPDATE volumes SET status=? WHERE name=?',(status,name))
+                self.db.commit()
+        return failed
+
+    def scan(self):
+        with self.lock:
+            intents = [json.loads(row[0]) for row in self.db.execute('SELECT document FROM intents')]
+        failed = False
+        for intent in intents:
+            intent_failed = False
+            try:
+                labels = [f'atomicagent_guardian={self.identity}',f'atomicagent_operation={intent["operation_id"]}',f'atomicagent_run={intent["run_id"]}']
+                filters = urllib.parse.quote(json.dumps({'label':labels}))
+                resources = docker('GET','/containers/json?all=1&filters='+filters)
+                if resources is None:
+                    raise ValueError('docker_unavailable')
+                for item in resources:
+                    try:
+                        self.discover(intent,item)
+                    except Exception:
+                        intent_failed = True
+            except Exception:
+                intent_failed = True
+            # A failed discovery or earlier resource never suppresses disposal of known identities.
+            try:
+                if time.time() >= datetime.datetime.fromisoformat(intent['deadline_at'].replace('Z','+00:00')).timestamp():
+                    intent_failed = self.expire(intent) or intent_failed
+            except Exception:
+                intent_failed = True
+            with self.lock:
+                self.db.execute('INSERT INTO observations VALUES(?,?,?) ON CONFLICT(operation) DO UPDATE SET status=excluded.status,observed_at=excluded.observed_at',(intent['operation_id'],'unknown' if intent_failed else 'observed',stamp()))
+                self.db.commit()
+            failed = failed or intent_failed
+        self.observed_at, self.available = stamp(), not failed
 
     def health(self):
         with self.lock:
-            return {'source':'independent-guardian:docker-inspection','observed_at':self.observed_at,'queried_at':stamp(),'status':'available' if self.available else 'unknown','coverage':'registered-immutable-create-intents-only','intents_retained':self.db.execute('SELECT count(*) FROM intents').fetchone()[0],'resources_unresolved':self.db.execute("SELECT count(*) FROM resources WHERE status!='absent'").fetchone()[0]}
+            fresh = self.observed_at is not None and 0 <= time.time()-datetime.datetime.fromisoformat(self.observed_at).timestamp() <= 5
+            return {'source':'independent-guardian:docker-inspection','observed_at':self.observed_at,'queried_at':stamp(),'status':'available' if self.available and fresh else 'unknown','freshness':'fresh' if fresh else 'stale-or-unobserved','coverage':'registered-immutable-create-intents-only','intents_retained':self.db.execute('SELECT count(*) FROM intents').fetchone()[0],'volumes_unresolved':self.db.execute("SELECT count(*) FROM volumes WHERE status!='absent'").fetchone()[0],'unknown_intents':self.db.execute("SELECT count(*) FROM observations WHERE status='unknown'").fetchone()[0],'resources_unresolved':self.db.execute("SELECT count(*) FROM resources WHERE status!='absent'").fetchone()[0]}
 
 
 def main():

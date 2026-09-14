@@ -30,7 +30,7 @@ export interface Run {
   skills?: SkillEvidence[]; mcp?: McpEvidence[];
   boundary?: BoundaryEvidence;
   resource_limits?: import('./resource-limits.js').ResourceEvidence;
-  limit_termination?: { dimension: 'total_timeout_seconds' | 'artifact_bytes' | 'memory_mib' | 'workspace_bytes'; observed_at:string; source:string }; 
+  limit_termination?: { dimension: 'total_timeout_seconds' | 'artifact_bytes' | 'memory_mib' | 'workspace_bytes'; observed_at:string; source:string };
   manifest: { limits?: import('./limits.js').ExecutionLimits; skills?: SkillBinding[]; profile: Profile; environment?: RevisionRef; model?: RevisionRef; output_contract: 'summary-value@1' | 'data-statistics@1' | 'research-report@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema | typeof researchSchema;
     grant: { tools: string[]; mcp: McpBinding[]; inputs: InputBinding[]; external_access: 'model-only' | 'registered-readonly' }; deadline_at: string };
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out' | 'cancelled';

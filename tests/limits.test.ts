@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { createApp } from '../src/app.js';
 import { fixtureProfile } from '../src/profile.js';
 import { FixtureSandbox } from '../src/fixture-sandbox.js';
@@ -18,10 +19,26 @@ async function lab(t:TestContext,sandbox=new FixtureSandbox()) {
  const options={database:join(directory,'runs.db'),profile:{...fixtureProfile,timeout_seconds:3600},identities,sandbox};
  let app=await createApp(options),url=await app.listen();
  t.after(async()=>{await app.close();await rm(directory,{recursive:true,force:true});});
- return {sandbox,async restart(){await app.close();app=await createApp(options);url=await app.listen();},
+ return {sandbox,database:options.database,async restart(){await app.close();app=await createApp(options);url=await app.listen();},
   async request(path:string,data?:unknown,key='command',token=identities[0]!.token){return fetch(url+path,{method:data===undefined?'GET':'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json','Idempotency-Key':key},...(data===undefined?{}:{body:JSON.stringify(data)})});}};
 }
 const task={prompt:'three apples',profile:'json-lab@1',output_contract:'summary-value@1'};
+test('limit publication rolls back revision, receipt and audit together; the same command recovers after storage repair',async t=>{
+ const l=await lab(t),initial=await(await l.request('/v1/limits')).json();
+ const command={expected_revision:1,values:{...initial.current.values,concurrency:1},reason:'Recover publication'};
+ const preview=await(await l.request('/v1/limits/preview',command)).json(),body={...command,preview_digest:preview.preview_digest};
+ const db=new DatabaseSync(l.database);
+ try{
+  db.exec("CREATE TRIGGER limit_audit_fault BEFORE INSERT ON audit WHEN NEW.action='limits.publish' BEGIN SELECT RAISE(ABORT,'SYNTHETIC_SECRET'); END;");
+  const failed=await l.request('/v1/limits/commands',body,'recover');assert.equal(failed.status,503);assert.ok(!(await failed.text()).includes('SYNTHETIC_SECRET'));
+  assert.equal((await(await l.request('/v1/limits')).json()).current.revision,1);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM configuration_commands WHERE command_id='limits:recover'").get()!.n,0);
+  db.exec('DROP TRIGGER limit_audit_fault');
+  const receipt=await(await l.request('/v1/limits/commands',body,'recover')).json();assert.equal(receipt.revision,2);
+  await l.restart();assert.deepEqual(await(await l.request('/v1/limits/commands',body,'recover')).json(),receipt);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM audit WHERE action='limits.publish'").get()!.n,1);
+ }finally{db.close();}
+});
 test('a fresh normal setup uses a new 60 minute profile without mutating the legacy profile',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'atomic-setup-limit-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  await promisify(execFile)(process.execPath,['--import',import.meta.resolve('tsx'),fileURLToPath(new URL('../scripts/setup-local.ts',import.meta.url))],{cwd:directory});
@@ -83,5 +100,3 @@ test('limits are reviewed, published once, restored and frozen into new Runs; un
  assert.deepEqual((await(await l.request(`/v1/runs/${old.run_id}`)).json()).execution,old.execution);
  const money=await l.request('/v1/runs',{...task,limits:{max_cost_usd:1}},'money');assert.equal(money.status,422);assert.equal((await money.json()).error,'hard_money_limit_unsupported');
 });
-
-

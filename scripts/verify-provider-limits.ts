@@ -17,16 +17,16 @@ const url=await app.listen();const headers={Authorization:'Bearer ticket11-backe
 const call=(path:string,body?:unknown,key='task')=>fetch(url+path,{headers:{...headers,'Idempotency-Key':key},method:body?'POST':'GET',...(body?{body:JSON.stringify(body)}:{})});
 try{
  const file=await(await call('/v1/files',{format:'csv',content:'id,category,value\n1,a,3\n'},'file')).json();
- const cases=mode==='crash'?[['crash','deadline-ticket11']]:[['default','Return approved JSON.'],['artifact','file-positive-ticket10'],['deadline','deadline-ticket11']];
+ const cases=mode==='crash'?[['crash','deadline-ticket11']]:mode==='pressure'?[['memory','deadline-ticket11']]:[['default','Return approved JSON.'],['artifact','file-positive-ticket10'],['deadline','deadline-ticket11']];
  for(const [key,prompt] of cases){
   const fileTask=key==='artifact';
-  const limits=key==='default'?{}:{cpu:0.25,memory_mib:384,total_timeout_seconds:key==='crash'?25:key==='deadline'?12:60,...(fileTask?{artifact_bytes:1}:{})};
+  const limits=key==='default'?{}:{cpu:0.25,memory_mib:384,total_timeout_seconds:key==='crash'?30:key==='deadline'?15:60,...(fileTask?{artifact_bytes:1}:{})};
   const response=await call('/v1/runs',{prompt,profile:profile.id,output_contract:fileTask?'data-statistics@1':'summary-value@1',limits,...(fileTask?{inputs:[{file_id:file.file_id,path:'input/data.csv'}]}:{})},key);
   assert.equal(response.status,202,await response.clone().text());let run=await response.json();
   await writeFile(`/records/${mode}/${key}-accepted.json`,JSON.stringify(run,null,2));
   for(let i=0;i<800&&(!run.terminal_at||run.cleanup.status==='pending');i++){await new Promise(r=>setTimeout(r,200));run=await(await call('/v1/runs/'+run.run_id)).json();}
   console.log(JSON.stringify({key,run}));await writeFile(`/records/${mode}/${key}-result.json`,JSON.stringify(run,null,2));
-  assert.equal(run.cleanup.status,'complete');if(key==='default'){assert.equal(run.status,'succeeded');assert.equal(run.resource_limits.memory_bytes,4294967296);}else if(key==='artifact'){assert.equal(run.failure,'budget_exceeded');}else assert.equal(run.failure,'deadline_exceeded');
+  assert.equal(run.cleanup.status,'complete');if(key==='default'){assert.equal(run.status,'succeeded');assert.equal(run.resource_limits.memory_bytes,4294967296);}else if(key==='artifact'||key==='memory'){assert.equal(run.failure,'budget_exceeded');assert.equal(run.limit_termination.dimension,key==='memory'?'memory_mib':'artifact_bytes');}else assert.equal(run.failure,'deadline_exceeded');
  }
  console.log(JSON.stringify({health:await(await call('/internal/health')).json(),source:'real-api-provider-cli-controlled-protocol',model_inference:'not-tested'}));
 }finally{await app.close();}

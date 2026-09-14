@@ -1,5 +1,5 @@
 import { effectiveLimits } from './limits.js';
-import { resourceEvidence, memoryBudgetExceeded, type ResourceEvidence } from './resource-limits.js';
+import { resourceEvidence, memoryBudgetExceeded, memoryEvents, type ResourceEvidence } from './resource-limits.js';
 import type { GuardianClient } from './guardian.js';
 import { validateBoundary, type ObserveBoundary } from './execution-boundary.js';
 import { type ObserveMcp, validateMcpEvidence } from './research.js';
@@ -60,13 +60,27 @@ export class OpenSandboxAdapter implements SandboxPort {
     this.requireRuntime(run);
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation!.resource_id!, connectionConfig: this.config(run), readyTimeoutSeconds: 10 });
     let observationImported = false, mcpImported = false;
-    let resources:ResourceEvidence|undefined;
+    let resources:ResourceEvidence|undefined, resourceFailure:TaskError|undefined;
+    const resourceController=new AbortController();
+    const executionSignal=AbortSignal.any([signal,resourceController.signal]);
+    let rejectResource!:(reason:unknown)=>void;
+    const resourceTerminated=new Promise<never>((_,reject)=>{rejectResource=reject;});
+    void resourceTerminated.catch(()=>{});
     let pollingDone = false;
     let polling: Promise<void> | undefined;
     const admittedCalls=new Set<string>();
     try {
       signal.throwIfAborted();
-      if(run.manifest.limits){const raw=await sandbox.files.readFile('/run/atomicagent/resources.json',{range:'bytes=0-4096'});if(Buffer.byteLength(raw)>4096)throw new TaskError('resource_limits_unavailable');resources=resourceEvidence(run,JSON.parse(raw));observeResources?.(resources);}
+      if(run.manifest.limits){
+        // Provider readiness is execd readiness; the trusted entrypoint may still be mounting its workspace.
+        const until=Math.min(Date.parse(run.manifest.deadline_at),Date.now()+5000);
+        while(!resources){
+          signal.throwIfAborted();
+          try{const raw=await sandbox.files.readFile('/run/atomicagent/resources.json',{range:'bytes=0-4096'});if(Buffer.byteLength(raw)>4096)throw new TaskError('resource_limits_unavailable');resources=resourceEvidence(run,JSON.parse(raw));}
+          catch{if(Date.now()>=until)throw new TaskError('resource_limits_unavailable');await new Promise(resolve=>setTimeout(resolve,50));}
+        }
+        observeResources?.(resources);
+      }
       await sandbox.files.createDirectories([{ path: '/run/atomicagent', mode: 700, owner: 'root', group: 'root' }]);
       await sandbox.files.createDirectories([{ path: '/workspace', mode: 700, owner: 'node', group: 'node' }]);
       const probe = await sandbox.commands.run('node /opt/atomicagent/dist/src/isolation-probe.js', {
@@ -86,7 +100,22 @@ export class OpenSandboxAdapter implements SandboxPort {
       signal.throwIfAborted();
       if(observeBoundary) polling = (async()=>{
         const acknowledged = new Set<string>();
+        let resourceCheckAt=0;
         while(!pollingDone && !signal.aborted) {
+          if(resources&&Date.now()-resourceCheckAt>=1000){
+            resourceCheckAt=Date.now();
+            try{const sample=await sandbox.commands.run('cat /sys/fs/cgroup/memory.events',{uid:0,gid:0,timeoutSeconds:2});const text=sample.logs.stdout.map(line=>line.text).join('\n');
+              if(!sample.error&&sample.exitCode===0&&memoryBudgetExceeded(resources.memory_events,text)){
+                resourceFailure=new TaskError('budget_exceeded','memory_mib');
+                // SDK 0.1.11 detaches abort forwarding after response headers; a live SSE body can outlive abort.
+                // Dispose the immutable provider resource and release the worker independently of that stream.
+                void this.forceStop(run).catch(()=>{});
+                try{observeResources?.({...resources,source:'opensandbox:cgroup-v2-observation',observed_at:new Date().toISOString(),memory_events:memoryEvents(text)});}
+                finally{resourceController.abort(resourceFailure);rejectResource(resourceFailure);}
+                return;
+              }
+            }catch{if(resourceFailure)return;/* Missing pressure evidence cannot justify an OOM classification. */}
+          }
           let checked;
           try { const raw=await sandbox.files.readFile('/run/atomicagent/boundary.json',{range:'bytes=0-32768'}); if(Buffer.byteLength(raw)<=32768) checked=validateBoundary(run,JSON.parse(raw)); } catch { /* A missing or partial spool cannot authorize. */ }
           if(checked) for(const call of checked.calls.filter(c=>c.outcome==='requested'&&!acknowledged.has(c.invocation_id))) {
@@ -103,12 +132,12 @@ export class OpenSandboxAdapter implements SandboxPort {
           await new Promise(resolve=>setTimeout(resolve,100));
         }
       })();
-      const execution = await sandbox.commands.run('node /opt/atomicagent/dist/src/runner.js', {
+      const execution = await Promise.race([resourceTerminated,sandbox.commands.run('node /opt/atomicagent/dist/src/runner.js', {
         workingDirectory: '/workspace', uid: 0, gid: 0,
         envs: { ANTHROPIC_API_KEY: token },
         timeoutSeconds: Math.max(1, Math.ceil((Date.parse(run.manifest.deadline_at) - Date.now()) / 1000)),
-      }, { skipAccumulation: true }, signal);
-      if(resources){const observed=await sandbox.commands.run('cat /sys/fs/cgroup/memory.events',{uid:0,gid:0,timeoutSeconds:2});if(!observed.error&&observed.exitCode===0&&memoryBudgetExceeded(resources.memory_events,observed.logs.stdout.map(line=>line.text).join('')))throw new TaskError('budget_exceeded','memory_mib');}
+      }, { skipAccumulation: true }, executionSignal)]);
+      if(resources){const observed=await sandbox.commands.run('cat /sys/fs/cgroup/memory.events',{uid:0,gid:0,timeoutSeconds:2});if(!observed.error&&observed.exitCode===0&&memoryBudgetExceeded(resources.memory_events,observed.logs.stdout.map(line=>line.text).join('\n')))throw new TaskError('budget_exceeded','memory_mib');}
       if (execution.error || execution.exitCode !== 0) throw new TaskError('runtime_failed');
       const info = await sandbox.files.getFileInfo(['/run/atomicagent/result.json']);
       const size = info['/run/atomicagent/result.json']?.size;
@@ -171,7 +200,7 @@ export class OpenSandboxAdapter implements SandboxPort {
           }
         } catch { /* Missing, partial or untrusted evidence stays unknown; never turn a failed command into success. */ }
       }
-      throw error;
+      throw resourceFailure??error;
     } finally { pollingDone=true; await polling; await sandbox.close(); }
   }
   async requestStop(run: Run) {
