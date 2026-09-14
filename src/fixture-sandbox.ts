@@ -1,4 +1,5 @@
 import { probeMcp, validateResearch, researchMarkdown, type ObserveMcp } from './research.js';
+import type { ObserveBoundary } from './execution-boundary.js';
 import { requestedSkills, verifySkill, type ObserveSkills } from './skills.js';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,6 +10,7 @@ import { INPUT_LIMIT } from './file-contract.js';
 import { sha256 } from './files.js';
 import { readSandboxFile, collectFiles } from './sandbox-files.js';
 import { TaskError, type Run, type SandboxPort, type LoadedInput } from './domain.js';
+import { callUsageEntries, usageProvider, type ObserveUsage, type UsageEntry, type UsageObservation } from './usage.js';
 // Explicit external-system double. Never selected by a live profile or by user prompt.
 export class FixtureSandbox implements SandboxPort {
   readonly source = 'deterministic-fixture';
@@ -34,11 +36,50 @@ export class FixtureSandbox implements SandboxPort {
     }
     await writeFile(join(root, 'request.json'), JSON.stringify({ input_path: inputs[0]!.binding.path, format: inputs[0]!.binding.format }));
   }
-  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown> {
+  // Fixed measurement material for the deterministic path. It exercises normalization end to end and is
+  // labelled as a double: it proves nothing about a real engine's or provider's consumption.
+  private usageSnapshots(run: Run): [UsageObservation, UsageObservation] {
+    const attempt_id = run.attempt_id!, invocation_id = `fixture-${run.run_id}`;
+    const observed_at = new Date().toISOString(), provider = usageProvider(run.manifest.profile);
+    const source = 'deterministic-fixture:usage-observation';
+    const shared = { attempt_id, scope: 'agent-main' as const, provider, source, observed_at, in_flight: false };
+    const sdk = (unit: UsageEntry['unit'], value: number | null, version: number): UsageEntry => ({ ...shared,
+      entry_id: `sdk:${unit}:v${version}`, series: `sdk:${unit}`, invocation_id: null, basis: 'sdk-estimate', unit, value,
+      reporting: 'cumulative', measurement_scope: 'attempt', completeness: value === null ? 'unknown' : 'complete', observation_version: version });
+    const metered = (suffix: string, unit: UsageEntry['unit'], value: number, basis: UsageEntry['basis']): UsageEntry => ({ ...shared,
+      entry_id: `${invocation_id}:${suffix}`, series: `${invocation_id}:${unit}:${basis}`, invocation_id, basis, unit, value,
+      reporting: 'delta', measurement_scope: 'invocation', completeness: 'complete', observation_version: 1 });
+    const invocation = (status: 'started' | 'completed') => ({ invocation_id, parent_invocation_id: null, retry_of: null, attempt_id,
+      kind: 'model' as const, target: provider, scope: 'agent-main' as const, status, source: 'deterministic-fixture:model-boundary', observed_at });
+    const call = { invocation_id, attempt_id, scope: 'agent-main' as const, provider, source, observed_at };
+    const header = { version: 1 as const, run_id: run.run_id, attempt_id, source, observed_at, coverage: 'deterministic-fixture-observations' };
+    // The opening observation records the call as in flight; the closing one only adds its ending marker,
+    // so one observation never carries two different versions of the same entry.
+    const [openedCall] = callUsageEntries({ ...call, in_flight: true });
+    const [, closedCall] = callUsageEntries({ ...call, in_flight: false });
+    const opening = [openedCall!, sdk('input_tokens', 120, 1), sdk('output_tokens', 20, 1)];
+    return [
+      { ...header, invocations: [invocation('started')], entries: opening },
+      { ...header, invocations: [invocation('completed')], entries: [...opening, closedCall!,
+        metered('request-bytes', 'request_bytes', 512, 'platform-observed'), metered('response-bytes', 'response_bytes', 1024, 'platform-observed'),
+        metered('provider-input_tokens', 'input_tokens', 118, 'provider-confirmed'), metered('provider-output_tokens', 'output_tokens', 21, 'provider-confirmed'),
+        sdk('input_tokens', 310, 2), sdk('output_tokens', 64, 2), sdk('cache_read_input_tokens', 0, 2), sdk('cache_creation_input_tokens', 0, 2),
+        // No priced model stands behind a fixture: cost stays unknown rather than becoming a zero.
+        sdk('estimated_cost_micro_usd', null, 2)] },
+    ];
+  }
+  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, _observeBoundary?: ObserveBoundary, _observeResources?: (value: unknown) => void, observeUsage?: ObserveUsage): Promise<unknown> {
     signal.throwIfAborted();
     if (this.stopped.has(run.run_id)) throw new TaskError('execution_lost');
     if (this.executions.has(run.run_id)) throw new TaskError('execution_lost');
     this.executions.add(run.run_id);
+    const [opening, closing] = run.attempt_id ? this.usageSnapshots(run) : [];
+    if (opening) observeUsage?.(opening);
+    try { return await this.run(run, signal, observeSkills, observeMcp); }
+    // A failed or cancelled attempt still reports what it consumed; a record fault surfaces through the worker.
+    finally { if (closing) try { observeUsage?.(closing); } catch { /* observation only */ } }
+  }
+  private async run(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp): Promise<unknown> {
     if (run.manifest.skills?.length) {
       run.manifest.skills.forEach(verifySkill);
       observeSkills?.(requestedSkills(run.manifest.skills).map(e => ({ ...e, materialized: true, loaded: true, callable: true, used: true, invocation_id: `fixture-${e.id}`, attempt_id: run.attempt_id, source: this.source, observed_at: new Date().toISOString() })));

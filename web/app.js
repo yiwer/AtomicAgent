@@ -1,6 +1,7 @@
 import { limitsPanel } from './limits.js';
 import { configurationPanel } from './configurations.js';
 import { observeRun } from './events.js';
+import { renderUsageTotals, usageFreshness, invocationStatusText, kindText, scopeText } from './usage.js';
 const $ = id => document.getElementById(id);
 const statusText = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败', cancelled: '已取消', timed_out: '已超期', pending: '待回收', complete: '已核验回收', unknown: '未知', preparing: '准备环境', executing: '执行中', terminal: '终态' };
 const errorText = { file_expired: '源文件已过期，请选择仍有效的产物。', file_incomplete: '源文件内容不完整，未接纳新任务。请选择其他产物。', input_contract_incompatible: '此产物不符合当前 CSV / 行数组 JSON 统计契约。', file_not_found: '源文件不存在或当前身份无权访问，请重新选择。', configuration_identity_changed: '登录身份已变化；请登录原身份找回配置操作。', configuration_conflict: '配置已被其他操作更新。请打开最新修订并重新预览。', configuration_preview_required: '请重新预览当前配置后再发布。', binding_not_allowed: '所选配置超过服务端登记的允许范围。', configuration_command_conflict: '此操作标识已绑定其他内容，请保留原操作材料核对。', authentication_required: '登录已失效，请重新登录。', forbidden: '当前身份无权执行此操作。', submission_identity_changed: '登录身份已变化，请重新登录原身份后找回提交。', config_unavailable: '登记配置不可用。', idempotency_conflict: '原提交标识已绑定其他内容；已保留恢复材料，请核对原提交。', service_unavailable: '服务暂不可用，请稍后点击刷新重试。', invalid_request: '请检查提示词与提交内容。' };
@@ -21,8 +22,12 @@ function ensureObservation(id, identity) {
   }) };
 }
 async function api(path, options = {}) {
-  const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
-  const data = await response.json();
+  let response, data;
+  // A transport failure is not a server verdict: report it as a retryable connection error, not a browser string.
+  try { response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } }); }
+  catch { throw new Error('连接失败，请重试。'); }
+  // An unreadable body on a rejected response must still report that rejection, not hide it as a connection error.
+  try { data = await response.json(); } catch { if (response.ok) throw new Error('连接失败，请重试。'); data = {}; }
   if (!response.ok) {
     if (response.status === 401 || ['submission_identity_changed', 'configuration_identity_changed', 'cancellation_identity_changed'].includes(data.error)) loggedOut();
     throw Object.assign(new Error(errorText[data.error] ?? `请求失败：${data.error ?? response.status}`), { submissionStatus: data.submission_status, commandStatus: data.command_status });
@@ -59,7 +64,8 @@ function loggedOut() {
   stopObservation();
   me = null; selected = null; selectedInput = null; pending = null; $('input-file').value = ''; $('input-status').textContent = '未绑定文件 · 提交提示词任务'; $('workspace').hidden = true; $('login').hidden = false;
   $('logout').hidden = true; $('refresh').hidden = true; $('identity').textContent = '未登录'; $('nav-workspace').textContent = '尚未登录';
-  $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('skill-evidence').replaceChildren(); $('mcp-evidence').textContent = ''; $('input-bindings').replaceChildren(); $('artifacts').replaceChildren(); $('detail').close();
+  $('runs').replaceChildren(); $('result').textContent = ''; $('manifest').textContent = ''; $('skill-evidence').replaceChildren(); $('mcp-evidence').textContent = ''; $('input-bindings').replaceChildren(); $('artifacts').replaceChildren();
+  $('usage-summary').textContent = ''; $('usage-totals').replaceChildren(); $('usage-invocations').replaceChildren(); $('usage-ledger').textContent = ''; $('detail').close();
   renderPending();
 }
 function node(tag, text, className) { const element = document.createElement(tag); element.textContent = text; if (className) element.className = className; return element; }
@@ -98,6 +104,17 @@ async function renderDetail(id, open = false) {
   const state = value => value === null ? '未知' : value ? '是' : '否';
   for (const e of run.skills ?? []) { const row = document.createElement('p'); row.textContent = `${e.id}@${e.version} · 已请求 ${state(e.requested)} · 文件已装载 ${state(e.materialized)} · 引擎已加载 ${state(e.loaded)} · 可调用 ${state(e.callable)} · 实际使用 ${state(e.used)} · ${e.source} · ${JSON.stringify(e.evidence_sources ?? {})} · ${e.observed_at ?? '尚无观测'} · 调用 ${e.invocation_id ?? '无'} · Attempt ${e.attempt_id ?? '尚未开始'}`; $('skill-evidence').append(row); }
   $('resource-limits').textContent=JSON.stringify({effective:run.execution.limits,observed:run.resource_limits,termination:run.limit_termination,stop:run.stop},null,2);
+  $('usage-summary').textContent = `${run.usage.measured ? '已计量' : '未计量：没有可信用量观测，未知消费不记为 0'} · ${usageFreshness(run.usage)}` +
+    ` · 已接受观测 ${run.usage.imports.accepted} 次 · 不可用观测 ${run.usage.imports.rejected} 次 · ${run.usage.in_flight ? '存在在途消费' : '无在途消费'}` +
+    ` · 可执行预算维度 ${run.usage.budget.enforced.map(d => d.dimension).join('、')} · 金额 ${run.usage.budget.unsupported[0].dimension} 不支持`;
+  renderUsageTotals($('usage-totals'), run.usage.totals);
+  $('usage-invocations').replaceChildren();
+  for (const invocation of run.usage.invocations) $('usage-invocations').append(node('p',
+    `${kindText[invocation.kind] ?? invocation.kind} · ${invocationStatusText[invocation.status] ?? invocation.status} · ${scopeText[invocation.scope] ?? invocation.scope}` +
+    ` · 目标 ${invocation.target} · 调用 ${invocation.invocation_id} · 父调用 ${invocation.parent_invocation_id ?? '无'} · 重试自 ${invocation.retry_of ?? '无'}` +
+    ` · Attempt ${invocation.attempt_id} · ${invocation.source} · ${invocation.observed_at}`));
+  if (!run.usage.invocations.length) $('usage-invocations').textContent = '尚无可观察调用记录';
+  $('usage-ledger').textContent = JSON.stringify(run.usage.entries, null, 2);
   $('manifest').textContent = JSON.stringify({ ...run.execution, inputs: run.inputs }, null, 2);
   $('artifacts').replaceChildren(); $('artifact-error').textContent = '';
   for (const artifact of result?.artifacts ?? []) {

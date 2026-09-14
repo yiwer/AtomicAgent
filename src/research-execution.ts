@@ -62,6 +62,8 @@ export async function runResearch(request: ClaudeRequest, root: string, runQuery
     if (!evidence.callable) throw new TaskError('required_capability_failed');
    }
    if (message.type !== 'result') continue;
+   // Recorded before any verdict: a failed or denied turn still consumed what the engine reports.
+   await request.observeEngineUsage?.(message.modelUsage);
    if (failed || !evidence.callable || service.receipts.length !== binding.sources.length) throw new TaskError('required_capability_failed');
    if (message.permission_denials.length) throw new TaskError('authorization_required');
    if (message.subtype !== 'success' || message.is_error) throw new TaskError('runtime_failed');

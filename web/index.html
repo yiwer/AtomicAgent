@@ -7,7 +7,7 @@
     <span class="nav-item muted">运维总览 <small>未接入</small></span><span class="nav-item muted">资源回收 <small>未接入</small></span>
     <p class="nav-label">能力与配置</p><button id="open-configurations" class="nav-item" hidden>环境与模型</button><button id="open-skills" class="nav-item" hidden>Skills</button><button id="open-mcp" class="nav-item" hidden>MCP 只读研究</button>
     <p class="nav-label">平台治理</p><button id="open-limits" class="nav-item" hidden>额度与限制</button><span class="nav-item muted">权限与审计 <small>未接入</small></span>
-    <footer>独立任务 · 明确交付<br>v0 / ticket01–11</footer>
+    <footer>独立任务 · 明确交付<br>v0 / ticket01–12</footer>
   </aside>
   <div class="layout"><header><span>工作区 / 任务运行</span><div><span id="identity">未登录</span><button id="logout" hidden>退出</button></div></header>
     <main>
@@ -37,7 +37,7 @@
     </main>
   </div>
   <dialog id="detail"><div class="detail-head"><div><p class="eyebrow">RUN DETAIL</p><h2>任务详情</h2></div><button id="close-detail" aria-label="关闭详情">关闭</button></div>
-    <p id="detail-id" class="mono"></p><p id="event-status" role="status"></p><p id="event-progress" class="muted"></p><dl id="facts"></dl><section id="cancellation"><h3>取消与实际停止</h3><p id="cancel-facts"></p><button id="cancel-run">取消任务</button><p id="cancel-error" role="status"></p></section><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>任务产物</h3><div id="artifacts"></div><p id="artifact-error" role="status"></p><h3>输入来源与独立副本</h3><div id="input-bindings"></div><h3>隔离与只读边界</h3><p id="boundary-summary"></p><pre id="boundary-evidence"></pre><h3>MCP 证据</h3><pre id="mcp-evidence"></pre><h3>Skill 证据</h3><div id="skill-evidence"></div><h3>实际限制观测</h3><pre id="resource-limits"></pre><h3>固定执行依据</h3><pre id="manifest"></pre>
+    <p id="detail-id" class="mono"></p><p id="event-status" role="status"></p><p id="event-progress" class="muted"></p><dl id="facts"></dl><section id="cancellation"><h3>取消与实际停止</h3><p id="cancel-facts"></p><button id="cancel-run">取消任务</button><p id="cancel-error" role="status"></p></section><h3>已校验结果</h3><pre id="result">尚无已提交结果</pre><h3>任务产物</h3><div id="artifacts"></div><p id="artifact-error" role="status"></p><h3>输入来源与独立副本</h3><div id="input-bindings"></div><h3>隔离与只读边界</h3><p id="boundary-summary"></p><pre id="boundary-evidence"></pre><h3>MCP 证据</h3><pre id="mcp-evidence"></pre><h3>Skill 证据</h3><div id="skill-evidence"></div><h3>实际限制观测</h3><pre id="resource-limits"></pre><h3>可信用量</h3><p id="usage-summary"></p><div id="usage-totals"></div><h4>可观察调用</h4><div id="usage-invocations"></div><pre id="usage-ledger"></pre><h3>固定执行依据</h3><pre id="manifest"></pre>
   </dialog>
   <dialog id="configurations"><div class="detail-head"><div><p class="eyebrow">CONFIGURATION REVISIONS</p><h2>环境与模型</h2></div><button id="close-configurations">关闭配置</button></div>
     <p class="notice">模型兼容性未取证。发布与停用只影响新接纳，已有 Run 保留固定清单和授权。</p>
@@ -63,5 +63,8 @@
 <p id="limits-error" role="alert"></p><p id="limits-result" role="status"></p><button id="limits-recover" hidden>找回未确认限额发布</button><button id="limits-refresh">读取最新限额</button>
 <form id="limits-form"><div id="limits-fields"></div><label for="limits-reason">限额调整理由</label><input id="limits-reason" maxlength="300" required><button id="limits-preview-button" type="submit">预览限额变更</button></form>
 <section id="limits-review" hidden><h3>发布前核对</h3><pre id="limits-changes"></pre><p>仅新 Run 冻结新执行限制；新的并发策略影响后续启动。旧 Run 清单不改写，既有执行不被终止。</p><button id="limits-publish" class="primary">确认发布限额</button></section>
+<section id="usage-panel"><h3>工作区可信用量</h3><p id="usage-scope" class="muted"></p>
+<p class="notice">用量按供应商、单位和来源分别归一化。引擎估算与供应商确认分开展示，同一消费不相加；未计量的消费显示为未知，不显示为 0。金额不是可执行预算维度。</p>
+<div id="usage-aggregate"></div><p id="usage-dimensions" class="muted"></p></section>
 <h3>固定修订历史</h3><pre id="limits-history"></pre></dialog>
 </body></html>

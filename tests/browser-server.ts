@@ -10,9 +10,9 @@ import type { SandboxPort } from '../src/domain.js';
 const directory = await mkdtemp(join(tmpdir(), 'atomicagent-browser-'));
 const sandbox: SandboxPort = new FixtureSandbox();
 const execute = sandbox.execute.bind(sandbox);
-sandbox.execute = async (run, signal, observeSkills, observeMcp, boundary) => {
+sandbox.execute = async (run, signal, observeSkills, observeMcp, boundary, resources, usage) => {
  if(run.prompt==='boundary-denial-fixture') boundary?.({run_id:run.run_id,attempt_id:run.attempt_id!,source:'controlled-runner:namespace-and-gateway',observed_at:new Date().toISOString(),isolation:'unknown',audit_coverage:'partial',calls:[{invocation_id:randomUUID(),boundary:'tool',outcome:'denied',observed_at:new Date().toISOString()}]});
- await new Promise(resolve => setTimeout(resolve, 2000)); return execute(run, signal, observeSkills, observeMcp);
+ await new Promise(resolve => setTimeout(resolve, 2000)); return execute(run, signal, observeSkills, observeMcp, boundary, resources, usage);
 };
 // A catalog-only live-mode fixture verifies the pre-submit warning. Its adapter fails closed: no network/model execution.
 const livePreview = { ...fixtureProfile, id: 'browser-live-preview@1', mode: 'opensandbox' as const,

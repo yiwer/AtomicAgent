@@ -79,17 +79,36 @@ queued ─→ running ─→ succeeded / failed / cancelled / timed_out
     "expires_at": "<任务终态时间加24小时>"
   }],
   "usage": {
-    "model_calls": 3,
-    "input_tokens": 1000,
-    "output_tokens": 300,
-    "provider_reported_cost": null
+    "source": "platform:durable-usage-ledger",
+    "queried_at": "<读取时间>", "observed_at": "<最近观测时间>", "freshness": "final-recorded-observation",
+    "coverage": "controlled-boundary-observations",
+    "provider": "<endpoint 主机>/<model>",
+    "measured": true, "in_flight": false,
+    "imports": {"accepted": 2, "rejected": 0},
+    "totals": [
+      {"provider": "<endpoint 主机>/<model>", "basis": "sdk-estimate", "unit": "input_tokens", "scope": "agent-main",
+       "value": 1000, "series": 1, "observations": 2, "unknown_series": 0, "in_flight": false,
+       "completeness": "complete", "observed_at": "<观测时间>", "sources": ["engine:claude-agent-sdk"]},
+      {"provider": "<endpoint 主机>/<model>", "basis": "provider-confirmed", "unit": "input_tokens", "scope": "agent-main",
+       "value": 996, "series": 3, "observations": 3, "unknown_series": 0, "in_flight": false,
+       "completeness": "complete", "observed_at": "<观测时间>", "sources": ["platform:model-gateway"]},
+      {"provider": "<endpoint 主机>/<model>", "basis": "sdk-estimate", "unit": "estimated_cost_micro_usd", "scope": "agent-main",
+       "value": null, "series": 1, "observations": 1, "unknown_series": 1, "in_flight": false,
+       "completeness": "unknown", "observed_at": "<观测时间>", "sources": ["engine:claude-agent-sdk"]}
+    ],
+    "invocations": [{"invocation_id": "…", "parent_invocation_id": null, "retry_of": null, "attempt_id": "…",
+      "kind": "model", "target": "<endpoint 主机>/<model>", "scope": "agent-main", "status": "completed",
+      "source": "platform:model-gateway", "observed_at": "<观测时间>"}],
+    "entries": ["<逐条原始观测，按 entry_id 去重、只追加>"],
+    "budget": {"enforced": ["<实际执行的限额维度>"], "observed_only": ["<仅计量单位>"],
+      "unsupported": [{"dimension": "cost", "reason": "no-provider-billing-adapter…"}], "policy_revision": 1}
   },
   "cleanup_status": "pending",
   "record_expires_at": "<任务终态时间加7天>"
 }
 ```
 
-示例中用量为虚构的字段演示，不是测量数据；`null` 表示没有可核实的供应商成本，不表示免费。真实字段要区分供应商报告、平台估算和未知；Qwen 不能直接沿用 Claude 的美元成本估值。
+示例中的数值为字段演示，不是测量数据；`null` 表示没有可核实的消费，不表示零或免费。`totals` 按（供应商，来源基准，单位，范围）分桶：`sdk-estimate` 与 `provider-confirmed` 永不相加，不同供应商的同名单位也不合并；累计序列取最新观测版本替换，增量按 `entry_id` 去重累加。`estimated_cost_micro_usd` 只是引擎列价估算，不是账单；供应商确认成本目前没有适配器，保持未知，Qwen 不能直接沿用 Claude 的美元成本估值。工作区聚合视图为 `GET /v1/usage`，与任务视图读同一批事实。
 
 `succeeded + cleanup_status=pending` 表示结果已提交且清理已触发，尚无清理完成证据。回收重试不覆盖成功结果。终态后禁止继续产生新的任务动作，并以执行层实际进程/环境状态确认回收。
 

@@ -17,11 +17,13 @@ import { contentDigest, manifestDigest, submissionDigest } from './submission.js
 import { Events } from './events.js';
 import { Configurations } from './configurations.js';
 import { cancellationObservation } from './cancellation.js';
+import { aggregateUsage, usageBudget, usageObservation, usageSummary, usageView } from './usage.js';
 
 interface AppOptions { guardian?:import('./guardian.js').GuardianPort; database: string; profile: Profile; identities: Identity[]; sandbox: SandboxPort; blobs?: BlobPort; clock?: () => number; cancellationClock?: () => number; approvedProfiles?: Profile[]; deploymentBindings?: { id: string; document: string; legacyApproval?: string }[] }
 const digest = (value: string) => createHash('sha256').update(value).digest();
-function publicRun(run: Run) {
+function publicRun(run: Run, detail = false) {
   return {
+    usage: detail ? usageView(run) : usageSummary(run),
     run_id: run.run_id, status: run.status, phase: run.phase, failure: run.failure,
     resource_limits:run.resource_limits??null, limit_termination: run.limit_termination ?? null, accepted_at: run.accepted_at, terminal_at: run.terminal_at, attempt_id: run.attempt_id,
     submission_digest: submissionDigest(run),
@@ -118,7 +120,7 @@ export async function createApp(options: AppOptions) {
       const authorized = authenticate(request);
       if (!visible(authorized, current)) throw new ApiError(404, 'run_not_found');
       if (waitSeconds > 0 && current.terminal_at) {
-        send(response, 200, { ...publicRun(current), result: current.result,
+        send(response, 200, { ...publicRun(current, true), result: current.result,
           artifacts: (current.artifacts ?? []).map(id => publicObject(store.object(id)!)) });
       } else send(response, 202, publicRun(current));
     } finally { response.removeListener('close', onClose); }
@@ -136,7 +138,7 @@ export async function createApp(options: AppOptions) {
       const method = request.method ?? 'GET';
       if (method === 'POST' && request.headers.origin && request.headers.origin !== `http://${request.headers.host}` && request.headers.origin !== `https://${request.headers.host}`)
         throw new ApiError(403, 'origin_denied');
-      if (method === 'GET' && ['/', '/app.js', '/events.js', '/configurations.js', '/limits.js', '/styles.css'].includes(path)) {
+      if (method === 'GET' && ['/', '/app.js', '/events.js', '/configurations.js', '/limits.js', '/usage.js', '/styles.css'].includes(path)) {
         const file = path === '/' ? 'index.html' : path.slice(1);
         const contents = await readFile(resolve('web', file));
         response.writeHead(200, { 'Content-Type': file.endsWith('.html') ? 'text/html; charset=utf-8' : file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
@@ -172,7 +174,7 @@ export async function createApp(options: AppOptions) {
         const runs = store.all().filter(r => r.workspace === identity!.workspace);
         let guardian:unknown={source:'independent-guardian',status:'unknown',observed_at:null,coverage:'not-connected'};
         if(options.guardian)try{guardian=await options.guardian.observation();}catch{/* Failure stays unknown. */}
-        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-11', guardian, limits: limits.observation(identity.workspace,runs,worker.activeRunIds), boundary: boundaryObservation(runs), cancellation: cancellationObservation(runs), configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, artifact_reuse: { source: 'platform:durable-input-bindings', observed_at: now(), coverage: 'artifact-copy-confirmation-and-run-cleanup', requested: runs.filter(r => r.manifest.grant.inputs.some(i => i.source)).length, confirmed: runs.filter(r => r.manifest.grant.inputs.some(i => i.source && i.loaded)).length, copy_failed: runs.filter(r => r.failure === 'input_copy_failed').length, source_expired: runs.filter(r => r.failure === 'input_source_expired').length, cleanup_unfinished: runs.filter(r => r.terminal_at && r.manifest.grant.inputs.some(i => i.source) && r.cleanup.status !== 'complete').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
+        send(response, 200, { observed_at: now(), source: 'platform:durable-runs', coverage: 'ticket01-12', guardian, limits: limits.observation(identity.workspace,runs,worker.activeRunIds), usage: usageObservation(runs), boundary: boundaryObservation(runs), cancellation: cancellationObservation(runs), configurations: configurations.observation(identity.workspace), skills: { observed_at: now(), source: 'platform:durable-skill-observations', coverage: 'recorded-run-capabilities-only', requested: runs.reduce((n, r) => n + (r.skills?.length ?? 0), 0), callable: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === true).length, used: runs.flatMap(r => r.skills ?? []).filter(e => e.used === true).length, unknown: runs.flatMap(r => r.skills ?? []).filter(e => e.callable === null || e.used === null).length, failed_runs: runs.filter(r => r.manifest.skills?.length && (r.failure === 'required_capability_failed' || r.failure === 'skill_use_unproven')).length }, mcp: { source: 'platform:durable-mcp-run-observations', observed_at: runs.flatMap(r => r.mcp ?? []).map(e => e.observed_at).filter(Boolean).sort().at(-1) ?? null, coverage: 'controlled-read-source-only', failed_runs: runs.filter(r => r.manifest.grant.mcp.length && r.failure === 'required_capability_failed').length, requested: runs.reduce((n, r) => n + (r.mcp?.length ?? 0), 0), unknown: runs.flatMap(r => r.mcp ?? []).filter(e => e.connected === null || e.authorized === null).length, acquired: runs.flatMap(r => r.mcp ?? []).reduce((n, e) => n + e.acquired, 0), model_tokens: null, model_cost: null }, artifact_reuse: { source: 'platform:durable-input-bindings', observed_at: now(), coverage: 'artifact-copy-confirmation-and-run-cleanup', requested: runs.filter(r => r.manifest.grant.inputs.some(i => i.source)).length, confirmed: runs.filter(r => r.manifest.grant.inputs.some(i => i.source && i.loaded)).length, copy_failed: runs.filter(r => r.failure === 'input_copy_failed').length, source_expired: runs.filter(r => r.failure === 'input_source_expired').length, cleanup_unfinished: runs.filter(r => r.terminal_at && r.manifest.grant.inputs.some(i => i.source) && r.cleanup.status !== 'complete').length }, submissions: store.submissionObservation(identity.workspace), events: events.observation(identity.workspace), object_storage: { source: 'platform:durable-object-obligations', observed_at: now(),
             unresolved: store.objects().filter(o => o.workspace === identity!.workspace && o.status === 'staged').length },
           running: runs.filter(r => r.status === 'running').length, queued: runs.filter(r => r.status === 'queued').length,
           cleanup_unfinished: runs.filter(r => r.terminal_at && r.cleanup.status !== 'complete').length,
@@ -183,6 +185,17 @@ export async function createApp(options: AppOptions) {
       if (identity.role === 'health') throw new ApiError(403, 'forbidden');
       if (!worker.acceptingWork && method === 'POST' && (path.startsWith('/v1/configurations') || path === '/v1/files')) throw new ApiError(503, 'core_records_unavailable');
       if (path === '/v1/limits' && method === 'GET') { send(response,200,limits.list(identity.workspace)); return; }
+      if (path === '/v1/usage' && method === 'GET') {
+        // Server-side visibility decides the scope: a caller aggregates only the Runs it owns.
+        const visibleRuns = store.all().filter(r => visible(identity!, r));
+        const policy = limits.current(identity.workspace);
+        store.audit(identity.actor, identity.workspace, 'usage.read', 'allowed');
+        send(response, 200, { ...aggregateUsage(visibleRuns), workspace: identity.workspace,
+          scope: identity.role === 'maintainer' ? 'workspace' : 'own-runs',
+          budget: usageBudget({ ...policy.values, policy_revision: policy.revision }),
+          by_run: visibleRuns.slice(0, 100).map(r => ({ run_id: r.run_id, status: r.status, failure: r.failure,
+            accepted_at: r.accepted_at, terminal_at: r.terminal_at, usage: usageSummary(r) })) }); return;
+      }
       if (['/v1/limits/preview','/v1/limits/commands'].includes(path) && method === 'POST') {
         if(identity.role!=='maintainer')throw new ApiError(403,'forbidden');
         if(!worker.acceptingWork)throw new ApiError(503,'core_records_unavailable');
@@ -300,7 +313,7 @@ export async function createApp(options: AppOptions) {
       }
       if (path === '/v1/runs' && method === 'GET') {
         store.audit(identity.actor, identity.workspace, 'run.list', 'allowed');
-        send(response, 200, { runs: store.all().filter(r => visible(identity!, r)).slice(0, 100).map(publicRun) }); return;
+        send(response, 200, { runs: store.all().filter(r => visible(identity!, r)).slice(0, 100).map(r => publicRun(r)) }); return;
       }
       const artifactMatch = path.match(/^\/v1\/artifacts\/([a-f0-9-]{36})(\/download-link|\/content)?$/);
       if (artifactMatch) {
@@ -343,7 +356,7 @@ export async function createApp(options: AppOptions) {
         try { cancelled = store.cancel(run.run_id, identity, options.cancellationClock?.()); }
         catch (error) { worker.cancelRecordFailure(run); throw error; }
         worker.cancel(run.run_id);
-        send(response, 200, publicRun(cancelled)); return;
+        send(response, 200, publicRun(cancelled, true)); return;
       }
       const match = path.match(/^\/v1\/runs\/([a-f0-9-]{36})(\/result|\/events)?$/);
       if (match && method === 'GET') {
@@ -361,8 +374,9 @@ export async function createApp(options: AppOptions) {
         store.audit(identity.actor, identity.workspace, match[2] ? 'result.read' : 'run.read', 'allowed', run.run_id);
         if (match[2]) {
           if (run.status !== 'succeeded') throw new ApiError(409, 'result_unavailable');
+          // The committed Result stays byte-identical across reads; measurement is read from the Run view.
           send(response, 200, { run_id: run.run_id, result: run.result, artifacts: (run.artifacts ?? []).map(id => publicObject(store.object(id)!)), validation: run.validation });
-        } else send(response, 200, publicRun(run));
+        } else send(response, 200, publicRun(run, true));
         return;
       }
       throw new ApiError(404, 'not_found');

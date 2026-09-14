@@ -2,6 +2,7 @@ import type { McpBinding, McpEvidence, ResearchResult, researchSchema, ObserveMc
 import type { SkillBinding, SkillEvidence, ObserveSkills } from './skills.js';
 import type { fileSchema } from './file-contract.js';
 import type { BoundaryEvidence, ObserveBoundary } from './execution-boundary.js';
+import type { ObserveUsage } from './usage.js';
 export type Role = 'caller' | 'maintainer' | 'health';
 export interface Identity { token: string; actor: string; workspace: string; role: Role }
 export interface Profile {
@@ -29,6 +30,7 @@ export interface Run {
   request_digest_version?: 2; manifest_digest?: string;
   skills?: SkillEvidence[]; mcp?: McpEvidence[];
   boundary?: BoundaryEvidence;
+  usage?: import('./usage.js').UsageLedger;
   resource_limits?: import('./resource-limits.js').ResourceEvidence;
   limit_termination?: { dimension: 'total_timeout_seconds' | 'artifact_bytes' | 'memory_mib' | 'workspace_bytes'; observed_at:string; source:string };
   manifest: { limits?: import('./limits.js').ExecutionLimits; skills?: SkillBinding[]; profile: Profile; environment?: RevisionRef; model?: RevisionRef; output_contract: 'summary-value@1' | 'data-statistics@1' | 'research-report@1'; checks?: string[] | 'data-statistics@1'; schema: typeof outputSchema | typeof fileSchema | typeof researchSchema;
@@ -58,7 +60,7 @@ export interface SandboxPort {
   sourceFor?(run: Run): string;
   prepare(run: Run): Promise<string>;
   loadInputs?(run: Run, inputs: LoadedInput[]): Promise<void>;
-  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary, observeResources?: (value:unknown)=>void): Promise<unknown>;
+  execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary, observeResources?: (value:unknown)=>void, observeUsage?: ObserveUsage): Promise<unknown>;
   requestStop?(run: Run): Promise<void>;
   forceStop?(run: Run): Promise<'stopped' | 'unknown'>;
   cleanup(run: Run): Promise<'absent' | 'unknown' | 'present'>;

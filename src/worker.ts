@@ -11,6 +11,7 @@ import { validateFiles } from './file-validator.js';
 import type { StoredObject } from './domain.js';
 import { Cancellation } from './cancellation.js';
 import { validateBoundary, type ObserveBoundary } from './execution-boundary.js';
+import { mcpUsageLedger, mergeUsage, rejectUsage, validateUsage, type ObserveUsage, type UsageObservation } from './usage.js';
 const validates = new Ajv({ strict: true }).compile(outputSchema);
 async function beforeDeadline<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) { void operation.catch(() => {}); throw signal.reason instanceof TaskError ? signal.reason : new TaskError('deadline_exceeded'); }
@@ -88,6 +89,31 @@ export class Worker {
       if (!failure) { this.files.commit(artifacts, run.terminal_at); run.result = result as Run['result']; run.artifacts = artifacts.map(a => a.object_id); }
     });
   }
+  // Registered MCP reads are measured from evidence the platform already validated, so re-observation of the
+  // same call adds nothing and an unusable observation leaves consumption unknown instead of zero.
+  private foldMcpUsage(run: Run, evidence: McpEvidence[]) {
+    const ledger = mcpUsageLedger(run, evidence);
+    if (!ledger) return;
+    try { run.usage = mergeUsage(run.usage, validateUsage(run, ledger)); }
+    catch { run.usage = rejectUsage(run.usage, run); }
+  }
+  private recordUsage(executing: Run, value: unknown) {
+    let checked: UsageObservation | undefined;
+    try { checked = validateUsage(executing, value); } catch { /* Untrusted or partial measurement is never imported. */ }
+    try {
+      this.store.change(executing.run_id, 'usage.observed', r => {
+        if (r.attempt_id !== executing.attempt_id) throw new TaskError('execution_lost');
+        const merged = checked ? mergeUsage(r.usage, checked) : rejectUsage(r.usage, r);
+        const known = new Set((r.usage?.invocations ?? []).map(i => `${i.invocation_id}:${i.status}`));
+        for (const i of merged.invocations) if (!known.has(`${i.invocation_id}:${i.status}`))
+          this.store.audit('platform', r.workspace, 'invocation.observed', i.status, r.run_id,
+            { source: i.source, resource_id: `${i.kind}:${i.target}`, operation_id: i.invocation_id, observed_at: i.observed_at });
+        r.usage = merged;
+      }, { outcome: checked ? 'recorded' : 'rejected', evidence: { source: checked?.source ?? 'platform:rejected-usage-observation',
+        resource_id: executing.allocation?.resource_id ?? null, operation_id: executing.attempt_id, observed_at: now() } });
+    // Measurement is observational: a record fault stops new work through the usual path, it never invents a total.
+    } catch { this.recordFailure = true; }
+  }
   private async preparationReturned(run: Run, action: string, update: (run: Run) => void) {
     if (this.closed) { await this.sandbox.cleanup(run); return; }
     try { this.store.change(run.run_id, action, update); }
@@ -160,7 +186,7 @@ export class Worker {
       const observeMcp = (value: unknown) => { const checked = validateMcpEvidence(executing, value); this.store.change(executing.run_id, 'mcp.observed', r => { if (r.terminal_at || r.attempt_id !== executing.attempt_id) throw new TaskError('execution_lost'); for (const e of checked) for (const call of e.calls) {
         const old = r.mcp?.find(m => m.id === e.id)?.calls.find(c => c.invocation_id === call.invocation_id);
         if (old?.outcome !== call.outcome) this.store.audit('platform', r.workspace, 'mcp.call-observed', call.outcome, r.run_id, { source: e.source, resource_id: `mcp:${e.id}@${e.version}/${call.source_id ?? 'denied-tool'}`, operation_id: call.invocation_id, observed_at: call.observed_at });
-      } r.mcp = checked; }); };
+      } r.mcp = checked; this.foldMcpUsage(r, checked); }); };
       const observeBoundary: ObserveBoundary = value => {
         const checked = validateBoundary(executing, value);
         let admissionDenied=false;
@@ -181,11 +207,12 @@ export class Worker {
         // Throw after commit: a mixed terminal snapshot must preserve old call endings but grant no new permit.
         if(admissionDenied)throw new TaskError('execution_lost');
       };
+      const observeUsage: ObserveUsage = value => this.recordUsage(executing, value);
       const result = await beforeDeadline(this.sandbox.execute(executing, controller.signal, observeSkills, observeMcp, observeBoundary,value=>{
         const checked=resourceEvidence(executing,value);
         try{this.store.change(executing.run_id,'limits.execution-observed',r=>{if(r.terminal_at)throw new TaskError('execution_lost');r.resource_limits=checked;});}
         catch(error){this.recordFailure=true;throw error;}
-      }), controller.signal);
+      }, observeUsage), controller.signal);
       if (this.store.get(executing.run_id)?.boundary?.calls.some(c=>c.outcome==='denied')) throw new TaskError('policy_denied');
       const skillEvidence = this.store.get(executing.run_id)!.skills ?? [];
       for (const s of executing.manifest.skills ?? []) {
@@ -205,7 +232,7 @@ export class Worker {
         const e = checked[0];
         if (envelope.receipts.some(s => !e?.calls.some(c => c.invocation_id === s.invocation_id && c.source_id === s.id && c.outcome === 'acquired') || Date.parse(s.acquired_at) < Date.parse(executing.accepted_at) || Date.parse(s.acquired_at) > Date.now()+1000)) throw new TaskError('output_invalid');
         if (!e || e.id !== binding.id || e.version !== binding.version || e.connected !== true || e.callable !== true || e.authorized !== true || e.acquired !== envelope.receipts.length) throw new TaskError('required_capability_failed');
-        this.store.change(executing.run_id, 'mcp.observed', r => { r.mcp = checked;
+        this.store.change(executing.run_id, 'mcp.observed', r => { r.mcp = checked; this.foldMcpUsage(r, checked);
           for (const receipt of envelope.receipts) this.store.audit('platform', r.workspace, 'mcp.source-acquired', 'acquired', r.run_id, { source: receipt.source, resource_id: `mcp:${binding.id}@${binding.version}/${receipt.id}`, operation_id: receipt.invocation_id, observed_at: receipt.acquired_at });
         });
         candidate = research; phase = 'committing';

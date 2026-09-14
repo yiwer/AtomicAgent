@@ -8,6 +8,8 @@ import { Sandbox, SandboxManager, SandboxApiException, type ConnectionConfigOpti
 import { ARTIFACT_LIMIT, INPUT_LIMIT } from './file-contract.js';
 import { sha256 } from './files.js';
 import { TaskError, type Run, type SandboxPort, type LoadedInput } from './domain.js';
+import type { ObserveUsage } from './usage.js';
+const USAGE_SPOOL_LIMIT = 262_144;
 
 // Only this adapter may contact the provider. No request may supply endpoints, commands, credentials or images.
 export class OpenSandboxAdapter implements SandboxPort {
@@ -55,11 +57,24 @@ export class OpenSandboxAdapter implements SandboxPort {
       }
     } finally { await sandbox.close(); }
   }
-  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary, observeResources?: (value:unknown)=>void): Promise<unknown> {
+  // The container's usage journal is untrusted measurement, not authority: an unreadable or oversized
+  // spool leaves consumption unknown and never changes the execution verdict.
+  private async importUsage(sandbox: Sandbox, run: Run, observeUsage?: ObserveUsage, spool?: unknown) {
+    if (!observeUsage) return;
+    if (spool !== undefined) { observeUsage(spool); return; }
+    try {
+      const path = '/run/atomicagent/usage.json';
+      const info = (await sandbox.files.getFileInfo([path]))[path];
+      if (info?.type !== 'file' || typeof info.size !== 'number' || info.size > USAGE_SPOOL_LIMIT) return;
+      const raw = await sandbox.files.readFile(path, { range: `bytes=0-${USAGE_SPOOL_LIMIT}` });
+      if (Buffer.byteLength(raw) <= USAGE_SPOOL_LIMIT) observeUsage(JSON.parse(raw));
+    } catch { /* Missing or partial measurement stays unknown. */ }
+  }
+  async execute(run: Run, signal: AbortSignal, observeSkills?: ObserveSkills, observeMcp?: ObserveMcp, observeBoundary?: ObserveBoundary, observeResources?: (value:unknown)=>void, observeUsage?: ObserveUsage): Promise<unknown> {
     signal.throwIfAborted();
     this.requireRuntime(run);
     const sandbox = await Sandbox.connect({ sandboxId: run.allocation!.resource_id!, connectionConfig: this.config(run), readyTimeoutSeconds: 10 });
-    let observationImported = false, mcpImported = false;
+    let observationImported = false, mcpImported = false, usageImported = false;
     let resources:ResourceEvidence|undefined, resourceFailure:TaskError|undefined;
     const resourceController=new AbortController();
     const executionSignal=AbortSignal.any([signal,resourceController.signal]);
@@ -100,8 +115,10 @@ export class OpenSandboxAdapter implements SandboxPort {
       signal.throwIfAborted();
       if(observeBoundary) polling = (async()=>{
         const acknowledged = new Set<string>();
-        let resourceCheckAt=0;
+        let resourceCheckAt=0, usageCheckAt=0;
         while(!pollingDone && !signal.aborted) {
+          // In-flight consumption is imported while the attempt runs, not only once it returns.
+          if(observeUsage&&Date.now()-usageCheckAt>=1000){usageCheckAt=Date.now();await this.importUsage(sandbox,run,observeUsage);}
           if(resources&&Date.now()-resourceCheckAt>=1000){
             resourceCheckAt=Date.now();
             try{const sample=await sandbox.commands.run('cat /sys/fs/cgroup/memory.events',{uid:0,gid:0,timeoutSeconds:2});const text=sample.logs.stdout.map(line=>line.text).join('\n');
@@ -144,11 +161,13 @@ export class OpenSandboxAdapter implements SandboxPort {
       const limit = run.manifest.output_contract !== 'summary-value@1' ? Math.ceil(ARTIFACT_LIMIT * 4 / 3) + 32_768 : 16_384;
       if (info['/run/atomicagent/result.json']?.type !== 'file' || typeof size !== 'number' || size > limit) throw new TaskError('output_invalid');
       const content = await sandbox.files.readFile('/run/atomicagent/result.json', { range: `bytes=0-${limit}` });
-      let envelope: { boundary?: unknown; failure?: unknown; candidate?: unknown; files?: { path: string; base64: string }[]; execution?: unknown; skills?: unknown; receipts?: unknown; mcp?: unknown };
+      let envelope: { boundary?: unknown; failure?: unknown; candidate?: unknown; files?: { path: string; base64: string }[]; execution?: unknown; skills?: unknown; receipts?: unknown; mcp?: unknown; usage?: unknown };
       if (Buffer.byteLength(content) > limit) throw new TaskError('output_invalid');
       try { envelope = JSON.parse(content); } catch { throw new TaskError('output_invalid'); }
       const boundary = validateBoundary(run, envelope.boundary);
       observeBoundary?.(boundary);
+      await this.importUsage(sandbox, run, observeUsage, envelope.usage);
+      usageImported = true;
       if (run.manifest.skills?.length) { observeSkills?.(validateSkillEvidence(run, envelope.skills)); observationImported = true; }
       if (run.manifest.grant.mcp?.length) { observeMcp?.(validateMcpEvidence(run, envelope.mcp)); mcpImported = true; }
       if (envelope.failure) {
@@ -170,6 +189,7 @@ export class OpenSandboxAdapter implements SandboxPort {
       if (observeBoundary) {
         try { const raw = await sandbox.files.readFile('/run/atomicagent/boundary.json', { range:'bytes=0-32768' }); if (Buffer.byteLength(raw)<=32768) observeBoundary(validateBoundary(run,JSON.parse(raw))); } catch { /* Missing or invalid protected evidence remains unknown. */ }
       }
+      if (!usageImported) await this.importUsage(sandbox, run, observeUsage);
       if (!mcpImported && run.manifest.grant.mcp?.length && observeMcp) {
         try {
           const path = '/run/atomicagent/mcp-evidence.jsonl';
