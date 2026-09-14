@@ -1,0 +1,18 @@
+✔ real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial (94.087ms)
+✔ an empty provider listing cannot close an unknown create operation (3.9376ms)
+✔ forced stop uses provider deletion plus a fresh resource observation and preserves uncertainty (7.4892ms)
+✔ an already cancelled execution cannot connect or start a new command (0.5072ms)
+✔ cancellation markers preserve historical protocols: qualified=false, failed=none (10.6003ms)
+✔ cancellation markers preserve historical protocols: qualified=true, failed=none (6.2603ms)
+✔ cancellation markers preserve historical protocols: qualified=false, failed=/run/atomicagent-cancel.json (6.367ms)
+✔ cancellation markers preserve historical protocols: qualified=false, failed=/workspace/cancel.json (5.8095ms)
+✔ cancellation during OpenSandbox connect prevents command dispatch (4.0595ms)
+✔ cancellation during OpenSandbox request-upload prevents command dispatch (9.481ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 782.0726

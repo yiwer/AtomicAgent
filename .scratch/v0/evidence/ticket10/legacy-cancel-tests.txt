@@ -1,0 +1,16 @@
+✔ real OpenSandbox HTTP adapter requires a fresh 404 after delete, never a delete receipt or access denial (96.7446ms)
+✔ an empty provider listing cannot close an unknown create operation (4.1413ms)
+✔ forced stop uses provider deletion plus a fresh resource observation and preserves uncertainty (7.5012ms)
+✔ an already cancelled execution cannot connect or start a new command (0.509ms)
+✔ cancellation marker preserves the legacy runner path and reader identity (9.8264ms)
+✔ cancellation marker preserves the isolated runner path and reader identity (5.183ms)
+✔ cancellation during OpenSandbox connect prevents command dispatch (4.1164ms)
+✔ cancellation during OpenSandbox request-upload prevents command dispatch (9.256ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 765.6187

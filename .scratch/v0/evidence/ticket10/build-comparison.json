@@ -1,0 +1,8 @@
+{
+  "runtime_image": "sha256:f26adbee7fb83c4f8ee6f008793dde0c96de93591c30e210832a1aa4876a008a",
+  "mismatches": [],
+  "checked_at": "2026-09-14T01:51:57.3126670Z",
+  "checkpoint": "4574a6e3f6ec64d4a05b6079435bd26173ab1c68",
+  "files_verified": 32,
+  "files_expected": 32
+}

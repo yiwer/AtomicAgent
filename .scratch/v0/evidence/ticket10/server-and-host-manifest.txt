@@ -1,0 +1,16 @@
+dbb2f8cb05f76d1eaddf205fff1c5150ee5485346053a815b07139feb9f2672b  /tmp/isolation.patch
+933d56f35ab65c0f9ddc0d9e721a392e0632794f7facd0b29d7e0c32ade6555b  /app/server/opensandbox_server/services/docker/docker_service.py
+9c55b26a53dd83b45cf7f534bac6b722d72ab012cb1109126829dd6268f622c6  /app/server/opensandbox_server/services/docker/networking.py
+9aa623b81d5793fc3cf5c790369cc1648350e7b2425fcfcf67a769e9c9f64cde  /app/server/opensandbox_server/services/docker/port_allocator.py
+9847fb7cb902 atomicagent-ticket10-server Up 9 minutes
+ec7125bc40c2 atomicagent-ticket10-model Up 24 minutes
+e4b4a69baba7 relaticle-scheduler-1 Up 2 weeks (healthy)
+2012e183b01a relaticle-horizon-1 Up 2 weeks (healthy)
+1de24678ee87 relaticle-app-1 Up 2 weeks (healthy)
+9eb4810cc94a relaticle-postgres-1 Up 2 weeks (healthy)
+91e39c7793e8 relaticle-redis-1 Up 2 weeks (healthy)
+               total        used        free      shared  buff/cache   available
+Mem:            3723        1665         451         123        2020        2058
+Swap:           1987        1517         470
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda2        40G   13G   26G  33% /

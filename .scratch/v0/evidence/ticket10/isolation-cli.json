@@ -1,0 +1,78 @@
+{
+  "source": "linux-docker-real-bwrap-and-bundled-claude-cli",
+  "node": "24.18.0",
+  "sdk": "0.3.270",
+  "observed_at": "2026-09-14T01:48:31.214Z",
+  "facts": {
+    "parent": true,
+    "proc": true,
+    "readonly": true,
+    "env": true,
+    "symlink": true,
+    "proxy": true,
+    "raw": true
+  },
+  "child_stopped": true,
+  "b_clean": true,
+  "modelCalls": 2,
+  "businessWrites": 0,
+  "model": "controlled-http-protocol-not-model-inference",
+  "gvisor": "not-tested",
+  "audit_coverage": "partial",
+  "events": [
+    {
+      "invocation_id": "8c191eb5-d721-430c-b29c-b8a3d34e6803",
+      "boundary": "transport",
+      "outcome": "completed",
+      "observed_at": "2026-09-14T01:48:27.944Z"
+    },
+    {
+      "invocation_id": "fced3941-4972-42a3-bfff-bca878436233",
+      "boundary": "model",
+      "outcome": "requested",
+      "observed_at": "2026-09-14T01:48:28.519Z"
+    },
+    {
+      "invocation_id": "fced3941-4972-42a3-bfff-bca878436233",
+      "boundary": "model",
+      "outcome": "started",
+      "observed_at": "2026-09-14T01:48:28.527Z"
+    },
+    {
+      "invocation_id": "fced3941-4972-42a3-bfff-bca878436233",
+      "boundary": "model",
+      "outcome": "completed",
+      "observed_at": "2026-09-14T01:48:28.544Z"
+    },
+    {
+      "invocation_id": "30adc616-8966-4936-9612-46736659070d",
+      "boundary": "model",
+      "outcome": "denied",
+      "observed_at": "2026-09-14T01:48:29.159Z"
+    },
+    {
+      "invocation_id": "cb883832-da16-4e09-98ad-5efbcbbf1a6a",
+      "boundary": "transport",
+      "outcome": "completed",
+      "observed_at": "2026-09-14T01:48:30.218Z"
+    },
+    {
+      "invocation_id": "8928bad7-5bf0-40ab-bff9-377cf65f0412",
+      "boundary": "model",
+      "outcome": "requested",
+      "observed_at": "2026-09-14T01:48:30.729Z"
+    },
+    {
+      "invocation_id": "8928bad7-5bf0-40ab-bff9-377cf65f0412",
+      "boundary": "model",
+      "outcome": "started",
+      "observed_at": "2026-09-14T01:48:30.730Z"
+    },
+    {
+      "invocation_id": "8928bad7-5bf0-40ab-bff9-377cf65f0412",
+      "boundary": "model",
+      "outcome": "completed",
+      "observed_at": "2026-09-14T01:48:30.817Z"
+    }
+  ]
+}

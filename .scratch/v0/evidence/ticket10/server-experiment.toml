@@ -1,0 +1,27 @@
+[server]
+host = "127.0.0.1"
+port = 43810
+api_key = "ticket10-controlled-server-key"
+max_sandbox_timeout_seconds = 300
+[runtime]
+type = "docker"
+execd_image = "opensandbox/execd:v1.1.0"
+[proxy]
+resolve_internal = true
+[store]
+type = "sqlite"
+path = "/tmp/ticket10.db"
+[docker]
+network_mode = "bridge"
+port_range_min = 43820
+port_range_max = 43920
+pids_limit = 128
+no_new_privileges = true
+drop_capabilities = ["AUDIT_WRITE", "MKNOD", "NET_ADMIN", "NET_RAW", "SYS_ADMIN", "SYS_MODULE", "SYS_PTRACE", "SYS_TIME", "SYS_TTY_CONFIG"]
+sandbox_env = { NODE_EXTRA_CA_CERTS = "/etc/ticket10-model.crt" }
+sandbox_binds = ["/tmp/atomicagent-ticket10-server/model.crt:/etc/ticket10-model.crt:ro"]
+[egress]
+image = "opensandbox/egress:v1.1.7"
+mode = "dns"
+[storage]
+allowed_host_paths = ["/tmp/atomicagent-ticket10-server"]
