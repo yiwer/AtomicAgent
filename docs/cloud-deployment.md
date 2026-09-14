@@ -14,7 +14,7 @@
 
 [工作流](../.github/workflows/deploy.yml) 在 main push、main PR 和手动触发时执行类型检查、单元测试、Linux Guardian 测试、构建与浏览器测试。只有 main 的非 PR 运行可以进入 `production` 环境发布；Actions 固定 commit，Docker Node 基础镜像固定 digest。
 
-CI 构建以完整 Git SHA 标记的镜像，通过专用 SSH 密钥流式传输。`ATOMIC_DEPLOY_SSH_KEY` 与 `ATOMIC_DEPLOY_KNOWN_HOSTS` 存储于 GitHub production 环境，主机身份严格校验。受限账号 `atomicagent-deploy` 不属于 Docker/sudo 组，只可通过 forced command 调用根拥有的部署程序；禁止转发、PTY 及其他 SSH 命令。CI 不获取应用访问令牌。
+CI 构建以完整 Git SHA 标记的镜像，通过专用 SSH 密钥流式传输，导入窗口为 20 分钟，发布 job 最长 25 分钟。`ATOMIC_DEPLOY_SSH_KEY` 与 `ATOMIC_DEPLOY_KNOWN_HOSTS` 存储于 GitHub production 环境，主机身份严格校验。受限账号 `atomicagent-deploy` 不属于 Docker/sudo 组，只可通过 forced command 调用根拥有的部署程序；禁止转发、PTY 及其他 SSH 命令。CI 不获取应用访问令牌。
 
 发布串行执行，过期的 main 提交跳过。安装脚本 [cloud-deploy.py](../deploy/cloud-deploy.py) 由管理员安装到 `/usr/local/sbin/atomicagent-deploy`；CI 不能覆盖它。脚本改动须经管理员同步后再部署。
 

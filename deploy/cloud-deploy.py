@@ -61,7 +61,7 @@ def deploy(revision):
     image = f'atomicagent-app:{revision}'
     # Docker accepts gzip on stdin. No source files or shell commands are uploaded.
     subprocess.run(['docker', 'load'], stdin=sys.stdin.buffer, stdout=subprocess.DEVNULL,
-                   check=True, timeout=600)
+                   check=True, timeout=1200)
     metadata = json.loads(docker('image', 'inspect', image, capture=True))[0]
     if metadata['Config']['Labels'].get('org.opencontainers.image.revision') != revision:
         raise RuntimeError('Image revision mismatch')
